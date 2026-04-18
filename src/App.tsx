@@ -10,10 +10,16 @@ import {
   FileText, 
   CheckCircle2, 
   Copy,
-  Download
+  Download,
+  ExternalLink,
+  Globe,
+  Share2,
+  Trash2,
+  Settings
 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from "react-markdown";
+import { marked } from "marked";
 
 interface ArticleData {
   title: string;
@@ -62,16 +68,27 @@ export default function App() {
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterIndustry, setFilterIndustry] = useState("All");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("local_seo_articles");
     if (saved) {
       setSavedArticles(JSON.parse(saved));
     }
+    const savedWebhook = localStorage.getItem("seo_webhook_url");
+    if (savedWebhook) {
+      setWebhookUrl(savedWebhook);
+    }
   }, []);
 
   const saveToLocalStorage = (articles: SavedArticle[]) => {
     localStorage.setItem("local_seo_articles", JSON.stringify(articles));
+  };
+
+  const saveWebhook = (url: string) => {
+    setWebhookUrl(url);
+    localStorage.setItem("seo_webhook_url", url);
   };
   const [cities, setCities] = useState<string[]>([]);
   const [showCities, setShowCities] = useState(false);
@@ -201,6 +218,68 @@ export default function App() {
   const handleCopy = () => {
     if (!articleData) return;
     navigator.clipboard.writeText(articleData.content);
+    alert("Markdown copied!");
+  };
+
+  const copyAsHTML = async () => {
+    if (!articleData) return;
+    const html = await marked.parse(articleData.content);
+    navigator.clipboard.writeText(html);
+    alert("Clean HTML copied!");
+  };
+
+  const copySEOBundle = () => {
+    if (!articleData) return;
+    const bundle = `
+ARTICLE TITLE: ${articleData.title}
+SEO TITLE: ${articleData.metaTitle}
+META DESCRIPTION: ${articleData.metaDescription}
+URL SLUG: ${articleData.suggestedSlug}
+
+INTERNAL LINKING SUGGESTIONS:
+${articleData.internalLinks.map(l => `- ${l}`).join("\n")}
+
+FAQ SCHEMA (JSON-LD):
+${articleData.schemaMarkup}
+
+--- CONTENT ---
+${articleData.content}
+    `;
+    navigator.clipboard.writeText(bundle.trim());
+    alert("SEO Bundle copied to clipboard!");
+  };
+
+  const sendToWebhook = async () => {
+    if (!articleData) return;
+    if (!webhookUrl) {
+      setShowSettings(true);
+      alert("Please configure a Webhook URL in settings first.");
+      return;
+    }
+
+    setLoading(true);
+    setLoadingMessage("Pushing to webhook...");
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "article_generated",
+          timestamp: new Date().toISOString(),
+          data: articleData
+        })
+      });
+      if (response.ok) {
+        alert("Success! Article sent to your webhook.");
+      } else {
+        throw new Error("Webhook failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send to webhook. Check your URL and connection.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const downloadMarkdown = () => {
@@ -350,15 +429,20 @@ export default function App() {
                   <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
                     Service / Industry
                   </label>
-                  <select 
-                    className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all cursor-pointer text-white appearance-none"
-                    value={formData.industry}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                  >
-                    {INDUSTRIES.map(i => (
-                      <option key={i} value={i} className="bg-slate-900">{i}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input 
+                      list="industry-suggestions"
+                      placeholder="e.g. Plumber, SEO Consultant..."
+                      className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium text-white placeholder:text-white/20"
+                      value={formData.industry}
+                      onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                    />
+                    <datalist id="industry-suggestions">
+                      {INDUSTRIES.map(i => (
+                        <option key={i} value={i} />
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
 
                 {/* Location */}
@@ -620,6 +704,31 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              {/* Export Suite Bar */}
+              <div className="max-w-4xl mx-auto mb-8 flex flex-wrap gap-4">
+                <button 
+                  onClick={copyAsHTML}
+                  className="flex-1 min-w-[150px] glass-panel rounded-xl px-4 py-4 flex items-center justify-center space-x-2 text-[10px] font-bold text-white/70 hover:text-white hover:border-accent/40 transition-all"
+                >
+                  <FileText className="w-4 h-4 text-accent" />
+                  <span>Copy as Clean HTML</span>
+                </button>
+                <button 
+                  onClick={copySEOBundle}
+                  className="flex-1 min-w-[150px] glass-panel rounded-xl px-4 py-4 flex items-center justify-center space-x-2 text-[10px] font-bold text-white/70 hover:text-white hover:border-accent/40 transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-accent" />
+                  <span>Copy SEO Bundle</span>
+                </button>
+                <button 
+                  onClick={sendToWebhook}
+                  className="flex-1 min-w-[150px] glass-panel rounded-xl px-4 py-4 flex items-center justify-center space-x-2 text-[10px] font-bold text-white/70 hover:text-white hover:border-accent/40 transition-all"
+                >
+                  <Globe className="w-4 h-4 text-accent" />
+                  <span>Push to Webhook</span>
+                </button>
+              </div>
             </div>
 
             {/* Article Content */}
@@ -729,10 +838,17 @@ export default function App() {
                   onChange={(e) => setFilterIndustry(e.target.value)}
                 >
                   <option value="All" className="bg-slate-900">All Industries</option>
-                  {INDUSTRIES.map(i => (
+                  {Array.from(new Set([...INDUSTRIES, ...savedArticles.map(a => a.industry)])).sort().map(i => (
                     <option key={i} value={i} className="bg-slate-900">{i}</option>
                   ))}
                 </select>
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="p-3 bg-white/5 border border-white/10 rounded-xl text-white/50 hover:text-white transition-all"
+                  title="Export Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
               </div>
             </div>
 
@@ -826,6 +942,65 @@ export default function App() {
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSettings(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-panel w-full max-w-lg rounded-[32px] p-10 relative z-10"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-white flex items-center tracking-tight">
+                  <Settings className="w-6 h-6 mr-3 text-accent" />
+                  Publishing Settings
+                </h2>
+                <button onClick={() => setShowSettings(false)} className="text-white/30 hover:text-white tracking-widest uppercase font-black text-[10px]">Close</button>
+              </div>
+              
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest block">
+                    Automation Webhook URL
+                  </label>
+                  <input 
+                    type="url"
+                    placeholder="https://hooks.zapier.com/..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-sm text-white focus:outline-none focus:border-accent transition-all"
+                    value={webhookUrl}
+                    onChange={(e) => saveWebhook(e.target.value)}
+                  />
+                  <p className="text-[10px] text-white/30 leading-relaxed">
+                    Connect to Zapier, Make.com, or a WordPress REST API endpoint. When you click "Push to Webhook", we'll send a POST request with the full article JSON.
+                  </p>
+                </div>
+
+                <div className="pt-6 border-t border-white/5">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-accent/10 rounded-xl">
+                      <Share2 className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">One-Click Exporting</h4>
+                      <p className="text-xs text-white/40">Clean HTML and SEO Bundling are enabled by default for all articles.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
