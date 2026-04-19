@@ -41,8 +41,15 @@ interface SavedArticle extends ArticleData {
   score: number;
 }
 
-// Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini lazily to avoid crashes if API key is missing during module load
+const getAiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    // We'll catch this later when actually trying to generate
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 const INDUSTRIES = [
   "Plumber", "Roofer", "Dentist", "Electrician", "HVAC", 
@@ -72,13 +79,24 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("local_seo_articles");
-    if (saved) {
-      setSavedArticles(JSON.parse(saved));
+    console.log("App mounted. View current state:", view);
+    try {
+      const saved = localStorage.getItem("local_seo_articles");
+      if (saved) {
+        setSavedArticles(JSON.parse(saved));
+      }
+    } catch (err) {
+      console.error("Failed to parse saved articles", err);
+      setSavedArticles([]);
     }
-    const savedWebhook = localStorage.getItem("seo_webhook_url");
-    if (savedWebhook) {
-      setWebhookUrl(savedWebhook);
+    
+    try {
+      const savedWebhook = localStorage.getItem("seo_webhook_url");
+      if (savedWebhook) {
+        setWebhookUrl(savedWebhook);
+      }
+    } catch (err) {
+      console.error("Failed to parse webhook URL", err);
     }
   }, []);
 
@@ -147,6 +165,12 @@ export default function App() {
 
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
+
+    const ai = getAiClient();
+    if (!ai) {
+      alert("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
+      return;
+    }
 
     setLoading(true);
     setProgress(0);
@@ -336,6 +360,13 @@ ${articleData.content}
 
   const rewriteSection = async (sectionText: string) => {
     if (!sectionText) return;
+    
+    const ai = getAiClient();
+    if (!ai) {
+      alert("GEMINI_API_KEY is not configured.");
+      return;
+    }
+
     setLoading(true);
     setLoadingMessage("AI is rewriting section...");
     try {
@@ -799,7 +830,7 @@ ${articleData.content}
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : view === "dashboard" ? (
           <motion.div 
             key="dashboard"
             initial={{ opacity: 0 }}
@@ -941,6 +972,15 @@ ${articleData.content}
                 </button>
               </div>
             )}
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="fallback"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center justify-center min-h-screen text-white/20 font-mono text-xs"
+          >
+            Initializing Local SEO Suite...
           </motion.div>
         )}
       </AnimatePresence>
