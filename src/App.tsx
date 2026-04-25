@@ -800,7 +800,7 @@ ${articleData.content}
                   </button>
                 </div>
                 <h1 className="text-5xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-                Generate Local SEO Content <br />
+                Generate Local SEO Contentt <br />
                 <span className="text-accent underline decoration-accent/30 decoration-offset-8">in Minutes</span>
               </h1>
               <p className="text-lg text-white/60 max-w-2xl mx-auto font-medium">
