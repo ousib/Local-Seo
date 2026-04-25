@@ -15,11 +15,19 @@ import {
   Globe,
   Share2,
   Trash2,
-  Settings
+  Settings,
+  LogIn,
+  LogOut,
+  Lock,
+  User as UserIcon
 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from "react-markdown";
 import { marked } from "marked";
+import { supabase } from "./lib/supabase";
+import { supabase } from "./lib/supabase";
+import { User } from "@supabase/supabase-js";
+import Auth from "./components/Auth";
 
 interface ArticleData {
   title: string;
@@ -63,7 +71,8 @@ interface ArticleRequest {
 }
 
 export default function App() {
-  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit">("landing");
+  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth">("landing");
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [editingArticle, setEditingArticle] = useState<SavedArticle | null>(null);
   const [formData, setFormData] = useState<ArticleRequest>({
@@ -77,27 +86,59 @@ export default function App() {
   const [filterIndustry, setFilterIndustry] = useState("All");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [cities, setCities] = useState<string[]>([]);
+  const [showCities, setShowCities] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState("Analyzing market data...");
+
+  const LOADING_MESSAGES = [
+    "Analyzing local market trends...",
+    "Scanning ${formData.location} for key SEO signals...",
+    "Drafting comprehensive industry insights...",
+    "Optimizing structure for search engines...",
+    "Injecting local relevance and context...",
+    "Finalizing SEO metadata..."
+  ];
 
   useEffect(() => {
-    console.log("App mounted. View current state:", view);
-    try {
-      const saved = localStorage.getItem("local_seo_articles");
-      if (saved) {
-        setSavedArticles(JSON.parse(saved));
+    if (!loading) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % LOADING_MESSAGES.length;
+      setLoadingMessage(LOADING_MESSAGES[i].replace("${formData.location}", formData.location));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [loading, formData.location]);
+
+  const autocompleteRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchCities = async () => {
+      if (formData.location.length < 2) {
+        setCities([]);
+        return;
       }
-    } catch (err) {
-      console.error("Failed to parse saved articles", err);
-      setSavedArticles([]);
-    }
-    
-    try {
-      const savedWebhook = localStorage.getItem("seo_webhook_url");
-      if (savedWebhook) {
-        setWebhookUrl(savedWebhook);
+      try {
+        const res = await fetch(`/api/cities?q=${formData.location}`);
+        const data = await res.json();
+        setCities(data);
+      } catch (err) {
+        console.error("Failed to fetch cities", err);
       }
-    } catch (err) {
-      console.error("Failed to parse webhook URL", err);
-    }
+    };
+
+    const timer = setTimeout(fetchCities, 300);
+    return () => clearTimeout(timer);
+  }, [formData.location]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
+        setShowCities(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const saveToLocalStorage = (articles: SavedArticle[]) => {
@@ -162,6 +203,165 @@ export default function App() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const saveToLocalStorage = (articles: SavedArticle[]) => {
+    localStorage.setItem("local_seo_articles", JSON.stringify(articles));
+  };
+
+  const saveWebhook = (url: string) => {
+    setWebhookUrl(url);
+    localStorage.setItem("seo_webhook_url", url);
+  };
+
+  useEffect(() => {
+    console.log("Auth Effect running");
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Current session:", session?.user?.email);
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("Auth changed:", _event, session?.user?.email);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    console.log("Data Fetch Effect running. User:", user?.email);
+    
+    const fetchArticles = async () => {
+      if (!user) {
+        setSavedArticles([]);
+        return;
+      }
+
+      console.log("Fetching articles for user...");
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      
+      if (!error && data) {
+        console.log("Fetched articles:", data.length);
+        setSavedArticles(data);
+      } else if (error) {
+        console.warn("Supabase fetch failed, trying localStorage:", error.message);
+        // Fallback
+        try {
+          const saved = localStorage.getItem("local_seo_articles");
+          if (saved) {
+            setSavedArticles(JSON.parse(saved));
+          }
+        } catch (err) {
+          console.error("Failed to parse saved articles", err);
+          setSavedArticles([]);
+        }
+      }
+    };
+
+    fetchArticles();
+    
+    try {
+      const savedWebhook = localStorage.getItem("seo_webhook_url");
+      if (savedWebhook) {
+        setWebhookUrl(savedWebhook);
+      }
+    } catch (err) {
+      console.error("Failed to parse webhook URL", err);
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!articleData) return;
+
+    if (!user) {
+      setView("auth");
+      return;
+    }
+    
+    const newArticle: SavedArticle = {
+      ...articleData,
+      id: crypto.randomUUID(),
+      industry: formData.industry,
+      location: formData.location,
+      topic: formData.topic,
+      createdAt: new Date().toISOString(),
+      wordCount: articleData.content.split(/\s+/).length,
+      score: Math.floor(Math.random() * 20) + 80 // Random high score for demo
+    };
+
+    setLoading(true);
+    setLoadingMessage("Saving to database...");
+
+    const { error } = await supabase
+      .from('articles')
+      .insert([newArticle]);
+
+    if (error) {
+      console.error("Supabase save failure:", error.message);
+      // Fallback to localStorage
+      const updated = [newArticle, ...savedArticles];
+      setSavedArticles(updated);
+      saveToLocalStorage(updated);
+      alert("Database unreachable. Saved to local browser storage instead.");
+    } else {
+      setSavedArticles(prev => [newArticle, ...prev]);
+      alert("Article saved to database!");
+    }
+    
+    setLoading(false);
+    setView("dashboard");
+  };
+
+  const deleteArticle = async (id: string) => {
+    const { error } = await supabase
+      .from('articles')
+      .delete()
+      .match({ id });
+
+    if (error) {
+      console.error("Supabase delete failure:", error.message);
+    }
+    
+    const updated = savedArticles.filter(a => a.id !== id);
+    setSavedArticles(updated);
+    saveToLocalStorage(updated);
+  };
+
+  const loadForEdit = (article: SavedArticle) => {
+    setEditingArticle(article);
+    setView("edit");
+  };
+
+  const updateArticle = async () => {
+    if (!editingArticle) return;
+    
+    setLoading(true);
+    setLoadingMessage("Updating database...");
+
+    const { error } = await supabase
+      .from('articles')
+      .update(editingArticle)
+      .match({ id: editingArticle.id });
+
+    if (error) {
+      console.error("Supabase update failure:", error.message);
+      alert("Database update failed. Changes reflected locally only.");
+    } else {
+      alert("Changes saved to database!");
+    }
+
+    const updated = savedArticles.map(a => a.id === editingArticle.id ? editingArticle : a);
+    setSavedArticles(updated);
+    saveToLocalStorage(updated);
+    
+    setLoading(false);
+    setView("dashboard");
+  };
 
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
@@ -317,45 +517,158 @@ ${articleData.content}
     URL.revokeObjectURL(url);
   };
 
-  const handleSave = () => {
+  const generateArticle = async () => {
+    if (!formData.location || !formData.topic) return;
+
+    const ai = getAiClient();
+    if (!ai) {
+      alert("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
+      return;
+    }
+
+    setLoading(true);
+    setProgress(0);
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 5, 95));
+    }, 1000);
+
+    try {
+      const prompt = `
+        Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
+        
+        Business Context:
+        - Industry: ${formData.industry}
+        - Location: ${formData.location}
+        - Target Topic: ${formData.topic}
+
+        Strict Content Quality Requirements:
+        - H1 tag MUST include the target keyword + location.
+        - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${formData.location} neighborhoods or specific local conditions).
+        - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${formData.location}", etc.).
+        - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${formData.location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
+        - **Seasonal Relevance**: Include advice specific to the current climate or season in ${formData.location} (e.g., "Preparing for high summer humidity in ${formData.location}...", "Winterizing pipes for Texas freezes...").
+        - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
+        - Naturally integrate LSI keywords (related industry terms).
+        - Frequently Asked Questions section.
+        - Strong Call to Action.
+        - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
+        - Generate FAQ Schema Markup in JSON-LD format.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: "H1 Title of the article (Keyword + Location)" },
+              metaTitle: { type: Type.STRING, description: "SEO Title tag (under 60 chars)" },
+              metaDescription: { type: Type.STRING, description: "Meta description (150-160 chars)" },
+              suggestedSlug: { type: Type.STRING, description: "URL-friendly slug" },
+              content: { type: Type.STRING, description: "The full 1,500-word article in Markdown format" },
+              internalLinks: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING },
+                description: "3-5 Internal linking suggestions" 
+              },
+              schemaMarkup: { type: Type.STRING, description: "FAQ JSON-LD schema markup" },
+            },
+            required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text);
+      setArticleData(data);
+      clearInterval(progressInterval);
+      setProgress(100);
+      setLoading(false);
+      setView("article");
+    } catch (err) {
+      console.error("Generation error", err);
+      setLoading(false);
+      clearInterval(progressInterval);
+    }
+  };
+
+  const handleCopy = () => {
     if (!articleData) return;
-    
-    const newArticle: SavedArticle = {
-      ...articleData,
-      id: crypto.randomUUID(),
-      industry: formData.industry,
-      location: formData.location,
-      topic: formData.topic,
-      createdAt: new Date().toISOString(),
-      wordCount: articleData.content.split(/\s+/).length,
-      score: Math.floor(Math.random() * 20) + 80 // Random high score for demo
-    };
-
-    const updated = [newArticle, ...savedArticles];
-    setSavedArticles(updated);
-    saveToLocalStorage(updated);
-    alert("Article saved to dashboard!");
-    setView("dashboard");
+    navigator.clipboard.writeText(articleData.content);
+    alert("Markdown copied!");
   };
 
-  const deleteArticle = (id: string) => {
-    const updated = savedArticles.filter(a => a.id !== id);
-    setSavedArticles(updated);
-    saveToLocalStorage(updated);
+  const copyAsHTML = async () => {
+    if (!articleData) return;
+    const html = await marked.parse(articleData.content);
+    navigator.clipboard.writeText(html);
+    alert("Clean HTML copied!");
   };
 
-  const loadForEdit = (article: SavedArticle) => {
-    setEditingArticle(article);
-    setView("edit");
+  const copySEOBundle = () => {
+    if (!articleData) return;
+    const bundle = `
+ARTICLE TITLE: ${articleData.title}
+SEO TITLE: ${articleData.metaTitle}
+META DESCRIPTION: ${articleData.metaDescription}
+URL SLUG: ${articleData.suggestedSlug}
+
+INTERNAL LINKING SUGGESTIONS:
+${articleData.internalLinks.map(l => `- ${l}`).join("\n")}
+
+FAQ SCHEMA (JSON-LD):
+${articleData.schemaMarkup}
+
+--- CONTENT ---
+${articleData.content}
+    `;
+    navigator.clipboard.writeText(bundle.trim());
+    alert("SEO Bundle copied to clipboard!");
   };
 
-  const updateArticle = () => {
-    if (!editingArticle) return;
-    const updated = savedArticles.map(a => a.id === editingArticle.id ? editingArticle : a);
-    setSavedArticles(updated);
-    saveToLocalStorage(updated);
-    alert("Changes saved!");
-    setView("dashboard");
+  const sendToWebhook = async () => {
+    if (!articleData) return;
+    if (!webhookUrl) {
+      setShowSettings(true);
+      alert("Please configure a Webhook URL in settings first.");
+      return;
+    }
+
+    setLoading(true);
+    setLoadingMessage("Pushing to webhook...");
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "article_generated",
+          timestamp: new Date().toISOString(),
+          data: articleData
+        })
+      });
+      if (response.ok) {
+        alert("Success! Article sent to your webhook.");
+      } else {
+        throw new Error("Webhook failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send to webhook. Check your URL and connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadMarkdown = () => {
+    if (!articleData) return;
+    const blob = new Blob([articleData.content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${articleData.suggestedSlug}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const rewriteSection = async (sectionText: string) => {
@@ -410,6 +723,16 @@ ${articleData.content}
     }, 100);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setView("landing");
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setView("landing");
+  };
+
   const filteredArticles = savedArticles.filter(a => {
     const matchesSearch = 
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -420,7 +743,37 @@ ${articleData.content}
 
   return (
     <div className="min-h-screen">
-      <AnimatePresence mode="wait">
+      {/* Auth State Button */}
+      <div className="fixed top-6 left-6 z-30">
+        {user ? (
+          <div className="flex items-center space-x-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full pl-2 pr-4 py-2">
+            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
+              <UserIcon className="w-4 h-4 text-accent" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter leading-none mb-1">Signed In</span>
+              <span className="text-xs font-bold text-white leading-none truncate max-w-[120px]">{user.email}</span>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-white/30 hover:text-white transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setView("auth")}
+            className="flex items-center space-x-2 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-5 py-2.5 transition-all group"
+          >
+            <LogIn className="w-4 h-4 text-white/50 group-hover:text-accent transition-colors" />
+            <span className="text-xs font-black text-white uppercase tracking-widest">Sign In</span>
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
         {view === "landing" ? (
           <motion.div 
             key="landing"
@@ -436,7 +789,10 @@ ${articleData.content}
                     AI-Powered Local SEO
                   </div>
                   <button 
-                    onClick={() => setView("dashboard")}
+                    onClick={() => {
+                      if (user) setView("dashboard");
+                      else setView("auth");
+                    }}
                     className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2 rotate-180" />
@@ -572,7 +928,7 @@ ${articleData.content}
               <div className="flex items-center"><b className="text-white mr-2">842</b> Cities Covered</div>
             </div>
           </motion.div>
-        ) : view === "edit" ? (
+        ) : view === "edit" && user ? (
           <motion.div 
             key="edit"
             initial={{ opacity: 0 }}
@@ -731,7 +1087,16 @@ ${articleData.content}
                     onClick={handleSave}
                     className="flex items-center px-6 py-3 bg-white/10 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
                   >
-                    Save
+                    {!user && <Lock className="w-3 h-3 mr-2 text-accent" />}
+                    {user ? "Save to Library" : "Sign in to Save"}
+                  </button>
+                  <div className="w-[1px] h-8 bg-white/10 mx-2" />
+                  <button 
+                    onClick={() => setShowSettings(true)}
+                    title="Export Settings"
+                    className="p-3 text-white/50 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                  >
+                    <Settings className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -830,7 +1195,7 @@ ${articleData.content}
               </div>
             </div>
           </motion.div>
-        ) : view === "dashboard" ? (
+        ) : view === "dashboard" && user ? (
           <motion.div 
             key="dashboard"
             initial={{ opacity: 0 }}
@@ -973,6 +1338,26 @@ ${articleData.content}
               </div>
             )}
           </motion.div>
+        ) : view === "auth" ? (
+          <motion.div 
+            key="auth"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center justify-center min-h-screen p-4"
+          >
+            <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
+          </motion.div>
+        ) : view === "auth" ? (
+          <motion.div 
+            key="auth"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center justify-center min-h-screen p-4"
+          >
+            <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
+          </motion.div>
         ) : (
           <motion.div 
             key="fallback"
@@ -1041,6 +1426,15 @@ ${articleData.content}
               </div>
             </motion.div>
           </div>
+        ) : (
+          <motion.div 
+            key="fallback"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center justify-center min-h-screen text-white/20 font-mono text-xs"
+          >
+            Initializing Local SEO Suite...
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
