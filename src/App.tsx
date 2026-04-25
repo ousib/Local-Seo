@@ -119,10 +119,12 @@ export default function App() {
       }
       try {
         const res = await fetch(`/api/cities?q=${formData.location}`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
         setCities(data);
       } catch (err) {
-        console.error("Failed to fetch cities", err);
+        console.error("City autocomplete fetch failed:", err);
+        setCities([]);
       }
     };
 
@@ -176,26 +178,34 @@ export default function App() {
       }
 
       console.log("Fetching articles for user...");
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .order('createdAt', { ascending: false });
-      
-      if (!error && data) {
-        console.log("Fetched articles:", data.length);
-        setSavedArticles(data);
-      } else if (error) {
-        console.warn("Supabase fetch failed, trying localStorage:", error.message);
-        // Fallback
-        try {
-          const saved = localStorage.getItem("local_seo_articles");
-          if (saved) {
-            setSavedArticles(JSON.parse(saved));
-          }
-        } catch (err) {
-          console.error("Failed to parse saved articles", err);
-          setSavedArticles([]);
+      try {
+        const { data, error } = await supabase
+          .from('articles')
+          .select('*')
+          .order('createdAt', { ascending: false });
+        
+        if (!error && data) {
+          console.log("Fetched articles:", data.length);
+          setSavedArticles(data);
+        } else if (error) {
+          console.warn("Supabase fetch failed, trying localStorage:", error.message);
+          loadFromLocalStorage();
         }
+      } catch (err) {
+        console.error("Supabase request exception:", err);
+        loadFromLocalStorage();
+      }
+    };
+
+    const loadFromLocalStorage = () => {
+      try {
+        const saved = localStorage.getItem("local_seo_articles");
+        if (saved) {
+          setSavedArticles(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.error("Failed to parse saved articles", err);
+        setSavedArticles([]);
       }
     };
 
