@@ -25,7 +25,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from "react-markdown";
 import { marked } from "marked";
 import { supabase } from "./lib/supabase";
-import { supabase } from "./lib/supabase";
 import { User } from "@supabase/supabase-js";
 import Auth from "./components/Auth";
 
@@ -86,69 +85,6 @@ export default function App() {
   const [filterIndustry, setFilterIndustry] = useState("All");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [cities, setCities] = useState<string[]>([]);
-  const [showCities, setShowCities] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState("Analyzing market data...");
-
-  const LOADING_MESSAGES = [
-    "Analyzing local market trends...",
-    "Scanning ${formData.location} for key SEO signals...",
-    "Drafting comprehensive industry insights...",
-    "Optimizing structure for search engines...",
-    "Injecting local relevance and context...",
-    "Finalizing SEO metadata..."
-  ];
-
-  useEffect(() => {
-    if (!loading) return;
-    let i = 0;
-    const interval = setInterval(() => {
-      i = (i + 1) % LOADING_MESSAGES.length;
-      setLoadingMessage(LOADING_MESSAGES[i].replace("${formData.location}", formData.location));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [loading, formData.location]);
-
-  const autocompleteRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const fetchCities = async () => {
-      if (formData.location.length < 2) {
-        setCities([]);
-        return;
-      }
-      try {
-        const res = await fetch(`/api/cities?q=${formData.location}`);
-        const data = await res.json();
-        setCities(data);
-      } catch (err) {
-        console.error("Failed to fetch cities", err);
-      }
-    };
-
-    const timer = setTimeout(fetchCities, 300);
-    return () => clearTimeout(timer);
-  }, [formData.location]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
-        setShowCities(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const saveToLocalStorage = (articles: SavedArticle[]) => {
-    localStorage.setItem("local_seo_articles", JSON.stringify(articles));
-  };
-
-  const saveWebhook = (url: string) => {
-    setWebhookUrl(url);
-    localStorage.setItem("seo_webhook_url", url);
-  };
   const [cities, setCities] = useState<string[]>([]);
   const [showCities, setShowCities] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -517,160 +453,6 @@ ${articleData.content}
     URL.revokeObjectURL(url);
   };
 
-  const generateArticle = async () => {
-    if (!formData.location || !formData.topic) return;
-
-    const ai = getAiClient();
-    if (!ai) {
-      alert("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
-      return;
-    }
-
-    setLoading(true);
-    setProgress(0);
-    const progressInterval = setInterval(() => {
-      setProgress(prev => Math.min(prev + 5, 95));
-    }, 1000);
-
-    try {
-      const prompt = `
-        Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
-        
-        Business Context:
-        - Industry: ${formData.industry}
-        - Location: ${formData.location}
-        - Target Topic: ${formData.topic}
-
-        Strict Content Quality Requirements:
-        - H1 tag MUST include the target keyword + location.
-        - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${formData.location} neighborhoods or specific local conditions).
-        - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${formData.location}", etc.).
-        - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${formData.location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
-        - **Seasonal Relevance**: Include advice specific to the current climate or season in ${formData.location} (e.g., "Preparing for high summer humidity in ${formData.location}...", "Winterizing pipes for Texas freezes...").
-        - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
-        - Naturally integrate LSI keywords (related industry terms).
-        - Frequently Asked Questions section.
-        - Strong Call to Action.
-        - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
-        - Generate FAQ Schema Markup in JSON-LD format.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "H1 Title of the article (Keyword + Location)" },
-              metaTitle: { type: Type.STRING, description: "SEO Title tag (under 60 chars)" },
-              metaDescription: { type: Type.STRING, description: "Meta description (150-160 chars)" },
-              suggestedSlug: { type: Type.STRING, description: "URL-friendly slug" },
-              content: { type: Type.STRING, description: "The full 1,500-word article in Markdown format" },
-              internalLinks: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING },
-                description: "3-5 Internal linking suggestions" 
-              },
-              schemaMarkup: { type: Type.STRING, description: "FAQ JSON-LD schema markup" },
-            },
-            required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
-          }
-        }
-      });
-
-      const data = JSON.parse(response.text);
-      setArticleData(data);
-      clearInterval(progressInterval);
-      setProgress(100);
-      setLoading(false);
-      setView("article");
-    } catch (err) {
-      console.error("Generation error", err);
-      setLoading(false);
-      clearInterval(progressInterval);
-    }
-  };
-
-  const handleCopy = () => {
-    if (!articleData) return;
-    navigator.clipboard.writeText(articleData.content);
-    alert("Markdown copied!");
-  };
-
-  const copyAsHTML = async () => {
-    if (!articleData) return;
-    const html = await marked.parse(articleData.content);
-    navigator.clipboard.writeText(html);
-    alert("Clean HTML copied!");
-  };
-
-  const copySEOBundle = () => {
-    if (!articleData) return;
-    const bundle = `
-ARTICLE TITLE: ${articleData.title}
-SEO TITLE: ${articleData.metaTitle}
-META DESCRIPTION: ${articleData.metaDescription}
-URL SLUG: ${articleData.suggestedSlug}
-
-INTERNAL LINKING SUGGESTIONS:
-${articleData.internalLinks.map(l => `- ${l}`).join("\n")}
-
-FAQ SCHEMA (JSON-LD):
-${articleData.schemaMarkup}
-
---- CONTENT ---
-${articleData.content}
-    `;
-    navigator.clipboard.writeText(bundle.trim());
-    alert("SEO Bundle copied to clipboard!");
-  };
-
-  const sendToWebhook = async () => {
-    if (!articleData) return;
-    if (!webhookUrl) {
-      setShowSettings(true);
-      alert("Please configure a Webhook URL in settings first.");
-      return;
-    }
-
-    setLoading(true);
-    setLoadingMessage("Pushing to webhook...");
-    try {
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "article_generated",
-          timestamp: new Date().toISOString(),
-          data: articleData
-        })
-      });
-      if (response.ok) {
-        alert("Success! Article sent to your webhook.");
-      } else {
-        throw new Error("Webhook failed");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to send to webhook. Check your URL and connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const downloadMarkdown = () => {
-    if (!articleData) return;
-    const blob = new Blob([articleData.content], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${articleData.suggestedSlug}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const rewriteSection = async (sectionText: string) => {
     if (!sectionText) return;
     
@@ -721,11 +503,6 @@ ${articleData.content}
     setTimeout(() => {
       generateArticle();
     }, 100);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setView("landing");
   };
 
   const handleLogout = async () => {
@@ -800,7 +577,7 @@ ${articleData.content}
                   </button>
                 </div>
                 <h1 className="text-5xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-                Generate Local SEO Contentt <br />
+                Generate Local SEO Content <br />
                 <span className="text-accent underline decoration-accent/30 decoration-offset-8">in Minutes</span>
               </h1>
               <p className="text-lg text-white/60 max-w-2xl mx-auto font-medium">
@@ -1348,16 +1125,6 @@ ${articleData.content}
           >
             <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
           </motion.div>
-        ) : view === "auth" ? (
-          <motion.div 
-            key="auth"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center justify-center min-h-screen p-4"
-          >
-            <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
-          </motion.div>
         ) : (
           <motion.div 
             key="fallback"
@@ -1426,15 +1193,6 @@ ${articleData.content}
               </div>
             </motion.div>
           </div>
-        ) : (
-          <motion.div 
-            key="fallback"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center justify-center min-h-screen text-white/20 font-mono text-xs"
-          >
-            Initializing Local SEO Suite...
-          </motion.div>
         )}
       </AnimatePresence>
     </div>
