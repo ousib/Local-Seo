@@ -20,15 +20,30 @@ export default function Auth({ onBack, onSuccess }: AuthProps) {
     setLoading(true);
     setError(null);
 
-    const { error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setError(error.message);
+    if (supabase.auth.getSession === undefined || (import.meta.env.VITE_SUPABASE_URL || "").includes("placeholder")) {
+      setError("Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.");
       setLoading(false);
-    } else {
-      onSuccess();
+      return;
+    }
+
+    try {
+      const { error } = isSignUp 
+        ? await supabase.auth.signUp({ email, password })
+        : await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        onSuccess();
+      }
+    } catch (err: any) {
+      if (err.message === 'Failed to fetch') {
+        setError("Network error: Could not reach Supabase. Check your Supabase URL and Internet connection.");
+      } else {
+        setError(err.message || "An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -28,6 +28,12 @@ import { supabase } from "./lib/supabase";
 import { User } from "@supabase/supabase-js";
 import Auth from "./components/Auth";
 
+declare global {
+  interface Window {
+    Paddle: any;
+  }
+}
+
 interface ArticleData {
   title: string;
   metaTitle: string;
@@ -48,11 +54,18 @@ interface SavedArticle extends ArticleData {
   score: number;
 }
 
+interface ArticleRequest {
+  industry: string;
+  location: string;
+  topic: string;
+}
+
 // Initialize Gemini lazily to avoid crashes if API key is missing during module load
 const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "undefined") {
-    // We'll catch this later when actually trying to generate
+  // Use Vite's import.meta.env as primary, with a safe fallback
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
+  
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -63,16 +76,125 @@ const INDUSTRIES = [
   "Real Estate", "Lawyer", "Restaurant", "Personal Trainer", "Car Mechanic"
 ];
 
-interface ArticleRequest {
-  industry: string;
-  location: string;
-  topic: string;
-}
+const LOADING_MESSAGES = [
+  "Analyzing local market trends...",
+  "Scanning market for key SEO signals...",
+  "Drafting comprehensive industry insights...",
+  "Optimizing structure for search engines...",
+  "Injecting local relevance and context...",
+  "Finalizing SEO metadata..."
+];
+
+const CITIES = [
+  "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
+  "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
+  "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Indianapolis, IN",
+  "Charlotte, NC", "San Francisco, CA", "Seattle, WA", "Denver, CO", "Washington, DC",
+  "Boston, MA", "Nashville, TN", "El Paso, TX", "Detroit, MI", "Oklahoma City, OK",
+  "Portland, OR", "Las Vegas, NV", "Memphis, TN", "Louisville, KY", "Baltimore, MD",
+  "Milwaukee, WI", "Albuquerque, NM", "Tucson, AZ", "Fresno, CA", "Sacramento, CA",
+  "Kansas City, MO", "Mesa, AZ", "Atlanta, GA", "Omaha, NE", "Colorado Springs, CO",
+  "Raleigh, NC", "Virginia Beach, VA", "Long Beach, CA", "Miami, FL", "Oakland, CA",
+  "Minneapolis, MN", "Tulsa, OK", "Bakersfield, CA", "Wichita, KS", "Arlington, TX"
+];
 
 export default function App() {
   const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth">("landing");
   const [user, setUser] = useState<User | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log("App mounted, view:", view);
+    // Add event listener for global errors
+    const handleError = (event: ErrorEvent) => {
+      console.error("Global error caught:", event.error);
+      setBootError(event.error?.message || "Unknown runtime error");
+    };
+    window.addEventListener("error", handleError);
+    return () => window.removeEventListener("error", handleError);
+  }, [view]);
+
+  useEffect(() => {
+    // Initialize Paddle with safety
+    try {
+      const paddleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+      if (window.Paddle && paddleToken && paddleToken !== 'your-paddle-client-token' && paddleToken !== '') {
+        // Auto-detect environment from token prefix
+        const isLive = paddleToken.startsWith('live_');
+        const isTest = paddleToken.startsWith('test_');
+        
+        // Default to environment variable if prefix is ambiguous, otherwise use prefix
+        const useSandbox = isTest || (!isLive && import.meta.env.VITE_PADDLE_ENVIRONMENT === 'sandbox');
+        
+        console.log("Configuring Paddle. Environment:", useSandbox ? "sandbox" : "production");
+        
+        if (useSandbox) {
+          window.Paddle.Environment.set('sandbox');
+        } else {
+          window.Paddle.Environment.set('production');
+        }
+
+        window.Paddle.Initialize({ 
+          token: paddleToken
+        });
+      }
+    } catch (err) {
+      console.error("Paddle initialization failed:", err);
+    }
+  }, []);
+
+  const handleUpgrade = () => {
+    if (!user) {
+      setView("auth");
+      return;
+    }
+
+    const priceId = import.meta.env.VITE_PADDLE_PRICE_ID;
+    const clientToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+
+    if (!clientToken || clientToken === 'your-paddle-client-token' || clientToken === '') {
+      alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your AI Studio Secrets.");
+      return;
+    }
+
+    if (!priceId || priceId === 'your-price-id' || priceId === '') {
+      alert("Paddle Price ID is missing. Please add VITE_PADDLE_PRICE_ID to your AI Studio Secrets.");
+      return;
+    }
+
+    if (!window.Paddle) {
+      alert("Payment system is still loading. Please try again in a few seconds.");
+      return;
+    }
+
+    try {
+      window.Paddle.Checkout.open({
+        items: [
+          {
+            priceId: priceId,
+            quantity: 1
+          }
+        ],
+        customer: {
+          email: user.email
+        },
+        customData: {
+          userId: user.id
+        },
+        settings: {
+          theme: 'dark',
+          displayMode: 'overlay',
+          successUrl: window.location.origin + '/dashboard?paddle_success=true'
+        }
+      });
+    } catch (err) {
+      console.error("Paddle Checkout failed to open:", err);
+      alert("Failed to open checkout. Check if your Price ID is valid for the current environment.");
+    }
+  };
+
   const [editingArticle, setEditingArticle] = useState<SavedArticle | null>(null);
   const [formData, setFormData] = useState<ArticleRequest>({
     industry: INDUSTRIES[0],
@@ -90,21 +212,12 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Analyzing market data...");
 
-  const LOADING_MESSAGES = [
-    "Analyzing local market trends...",
-    "Scanning ${formData.location} for key SEO signals...",
-    "Drafting comprehensive industry insights...",
-    "Optimizing structure for search engines...",
-    "Injecting local relevance and context...",
-    "Finalizing SEO metadata..."
-  ];
-
   useEffect(() => {
     if (!loading) return;
     let i = 0;
     const interval = setInterval(() => {
       i = (i + 1) % LOADING_MESSAGES.length;
-      setLoadingMessage(LOADING_MESSAGES[i].replace("${formData.location}", formData.location));
+      setLoadingMessage(LOADING_MESSAGES[i].replace("${formData.location}", formData.location || "selected location"));
     }, 3000);
     return () => clearInterval(interval);
   }, [loading, formData.location]);
@@ -112,23 +225,17 @@ export default function App() {
   const autocompleteRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchCities = async () => {
+    const fetchCities = () => {
       if (formData.location.length < 2) {
         setCities([]);
         return;
       }
-      try {
-        const res = await fetch(`/api/cities?q=${formData.location}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        setCities(data);
-      } catch (err) {
-        console.error("City autocomplete fetch failed:", err);
-        setCities([]);
-      }
+      const query = formData.location.toLowerCase();
+      const matches = CITIES.filter(city => city.toLowerCase().includes(query)).slice(0, 10);
+      setCities(matches);
     };
 
-    const timer = setTimeout(fetchCities, 300);
+    const timer = setTimeout(fetchCities, 150);
     return () => clearTimeout(timer);
   }, [formData.location]);
 
@@ -171,6 +278,13 @@ export default function App() {
   useEffect(() => {
     console.log("Data Fetch Effect running. User:", user?.email);
     
+    // Check for Paddle success
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('paddle_success') || urlParams.get('session_id')) {
+      setIsPremium(true);
+      console.log("Premium activated");
+    }
+
     const fetchArticles = async () => {
       if (!user) {
         setSavedArticles([]);
@@ -311,6 +425,12 @@ export default function App() {
 
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
+
+    if (!isPremium && savedArticles.length >= 3) {
+      alert("You've reached the free limit of 3 articles. Please upgrade to Pro to generate more content.");
+      setView("dashboard");
+      return;
+    }
 
     const ai = getAiClient();
     if (!ai) {
@@ -528,6 +648,28 @@ ${articleData.content}
     return matchesSearch && matchesIndustry;
   });
 
+  if (bootError) {
+    return (
+      <div className="min-h-screen bg-[#0b0e14] text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md glass-panel p-8 rounded-3xl border-red-500/20 bg-red-500/5">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Settings className="w-8 h-8 text-red-500" />
+          </div>
+          <h1 className="text-xl font-bold text-white mb-2 tracking-tight">Application Error</h1>
+          <p className="text-white/40 text-sm mb-8 font-medium leading-relaxed">
+            {bootError}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-white text-slate-950 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white/90 transition-all"
+          >
+            Reload Application
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       {/* Auth State Button */}
@@ -587,7 +729,7 @@ ${articleData.content}
                   </button>
                 </div>
                 <h1 className="text-5xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-                Generate Local SEO Contents <br />
+                Generate Local SEO Content <br />
                 <span className="text-accent underline decoration-accent/30 decoration-offset-8">in Minutes</span>
               </h1>
               <p className="text-lg text-white/60 max-w-2xl mx-auto font-medium">
@@ -1003,6 +1145,29 @@ ${articleData.content}
                 <h1 className="text-4xl font-extrabold text-white tracking-tight">Content Dashboard</h1>
                 <p className="text-white/50 font-medium mt-2">Manage and track your generated SEO assets</p>
               </div>
+
+              {!isPremium && (
+                <motion.div 
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 w-full order-first md:order-none"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center text-accent font-black text-xs uppercase tracking-widest mb-3">
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Upgrade to Pro
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">Unlock Unlimited Article Generation</h3>
+                    <p className="text-white/60">Free accounts are limited to 3 articles. Get unlimited generation and priority support.</p>
+                  </div>
+                  <button 
+                    onClick={handleUpgrade}
+                    className="px-8 py-4 bg-accent hover:bg-accent-light text-slate-900 font-black rounded-2xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap"
+                  >
+                    Get Pro for $29/mo
+                  </button>
+                </motion.div>
+              )}
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative">

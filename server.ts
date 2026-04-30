@@ -16,7 +16,18 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ 
+      status: "ok",
+      paddleConfigured: !!process.env.PADDLE_API_KEY,
+      webhookSecretSet: !!process.env.PADDLE_WEBHOOK_SECRET
+    });
+  });
+
+  // Paddle Webhook placeholder (Optional for now)
+  app.post("/api/paddle-webhook", (req, res) => {
+    // In production, verify Paddle signature and update database
+    console.log("Paddle Webhook received:", req.body);
+    res.status(200).send("OK");
   });
 
   // Mock city search for US cities
