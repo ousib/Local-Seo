@@ -9,7 +9,7 @@ import {
   BarChart3,
   CheckCircle2,
   TrendingUp,
-  MapPin,
+  Store,
   Clock
 } from "lucide-react";
 
@@ -101,6 +101,7 @@ export default function About({ onBack }: AboutProps) {
             {[
               "Unlimited High-Quality Articles",
               "Priority AI Processing",
+              "Google Maps Embed Generator",
               "Advanced JSON-LD Schema",
               "One-Click Webhook Exporting",
               "Custom Brand Voice Tuning",
@@ -131,10 +132,10 @@ export default function About({ onBack }: AboutProps) {
       <div className="mt-24 pt-24 border-t border-white/5 grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
         <div>
           <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
-            <MapPin className="w-5 h-5 text-accent" />
-            <h4 className="text-white font-bold tracking-tight">Global Footprint</h4>
+            <Store className="w-5 h-5 text-accent" />
+            <h4 className="text-white font-bold tracking-tight">Small Business First</h4>
           </div>
-          <p className="text-xs text-white/40 leading-relaxed font-medium">Serving local businesses across 842 cities worldwide, from local plumbers to urban dentists.</p>
+          <p className="text-xs text-white/40 leading-relaxed font-medium">Built specifically for the needs of local store owners and service providers, not bloated corporate agencies.</p>
         </div>
         <div>
           <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">

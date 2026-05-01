@@ -43,10 +43,12 @@ interface ArticleData {
   content: string;
   internalLinks: string[];
   schemaMarkup: string;
+  locationAddress?: string; // New field for Maps embed
 }
 
 interface SavedArticle extends ArticleData {
   id: string;
+  user_id?: string;
   industry: string;
   location: string;
   topic: string;
@@ -197,10 +199,11 @@ export default function App() {
   };
 
   const [editingArticle, setEditingArticle] = useState<SavedArticle | null>(null);
-  const [formData, setFormData] = useState<ArticleRequest>({
+  const [formData, setFormData] = useState({
     industry: INDUSTRIES[0],
     location: "",
-    topic: ""
+    topic: "",
+    exactAddress: "" // New field for specific map targeting
   });
   const [articleData, setArticleData] = useState<ArticleData | null>(null);
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
@@ -347,6 +350,7 @@ export default function App() {
     const newArticle: SavedArticle = {
       ...articleData,
       id: crypto.randomUUID(),
+      user_id: user.id,
       industry: formData.industry,
       location: formData.location,
       topic: formData.topic,
@@ -358,17 +362,31 @@ export default function App() {
     setLoading(true);
     setLoadingMessage("Saving to database...");
 
-    const { error } = await supabase
+    // Attempt to save with the new column, fallback if column is missing
+    console.log("Attempting to save article to Supabase...", newArticle);
+    const { error: initialError } = await supabase
       .from('articles')
       .insert([newArticle]);
 
-    if (error) {
-      console.error("Supabase save failure:", error.message);
+    let saveError = initialError;
+
+    // If the error is specifically about the missing column, retry without it
+    if (initialError?.message?.includes("locationAddress")) {
+      console.warn("Supabase schema mismatch: 'locationAddress' column missing. Retrying save without it.");
+      const { locationAddress, ...fallbackArticle } = newArticle;
+      const { error: retryError } = await supabase
+        .from('articles')
+        .insert([fallbackArticle]);
+      saveError = retryError;
+    }
+
+    if (saveError) {
+      console.error("Supabase persistent save failure:", saveError);
       // Fallback to localStorage
       const updated = [newArticle, ...savedArticles];
       setSavedArticles(updated);
       saveToLocalStorage(updated);
-      alert("Database unreachable. Saved to local browser storage instead.");
+      alert("Database unreachable or schema mismatch. Saved to local browser storage instead. Please run the SQL migration provided in the 'About' section.");
     } else {
       setSavedArticles(prev => [newArticle, ...prev]);
       alert("Article saved to database!");
@@ -404,13 +422,26 @@ export default function App() {
     setLoading(true);
     setLoadingMessage("Updating database...");
 
-    const { error } = await supabase
+    const { error: initialError } = await supabase
       .from('articles')
       .update(editingArticle)
       .match({ id: editingArticle.id });
 
-    if (error) {
-      console.error("Supabase update failure:", error.message);
+    let updateError = initialError;
+
+    // Graceful fallback for update as well
+    if (initialError?.message?.includes("locationAddress")) {
+      console.warn("Update failed due to missing locationAddress column. Retrying without it.");
+      const { locationAddress, ...fallbackArticle } = editingArticle;
+      const { error: retryError } = await supabase
+        .from('articles')
+        .update(fallbackArticle)
+        .match({ id: editingArticle.id });
+      updateError = retryError;
+    }
+
+    if (updateError) {
+      console.error("Supabase update failure:", updateError.message);
       alert("Database update failed. Changes reflected locally only.");
     } else {
       alert("Changes saved to database!");
@@ -494,6 +525,9 @@ export default function App() {
       });
 
       const data = JSON.parse(response.text);
+      // Inject the location address into the article data for display
+      data.locationAddress = formData.exactAddress || formData.location;
+      
       setArticleData(data);
       clearInterval(progressInterval);
       setProgress(100);
@@ -627,7 +661,8 @@ ${articleData.content}
     setFormData({
       industry: article.industry,
       location: article.location,
-      topic: article.topic
+      topic: article.topic,
+      exactAddress: article.locationAddress || ""
     });
     // Triggers generation in current scope
     setView("landing"); // Switch view first
@@ -806,17 +841,32 @@ ${articleData.content}
               </div>
 
               {/* Target Topic */}
-              <div className="space-y-3 mb-10">
-                <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
-                  Target Topic / Keyword
-                </label>
-                <textarea 
-                  rows={3}
-                  placeholder="e.g. Emergency pipe repair costs, Best dentists for kids..."
-                  className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium resize-none text-white placeholder:text-white/20"
-                  value={formData.topic}
-                  onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                />
+              <div className="space-y-6 mb-10">
+                <div className="space-y-3">
+                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
+                    Business Address / Map Location (Optional)
+                  </label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. 123 Main St, New York (Adds Google Map embed)"
+                    className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium text-white placeholder:text-white/20"
+                    value={formData.exactAddress}
+                    onChange={(e) => setFormData({ ...formData, exactAddress: e.target.value })}
+                  />
+                </div>
+                
+                <div className="space-y-3">
+                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
+                    Target Topic / Keyword
+                  </label>
+                  <textarea 
+                    rows={3}
+                    placeholder="e.g. Emergency pipe repair costs, Best dentists for kids..."
+                    className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium resize-none text-white placeholder:text-white/20"
+                    value={formData.topic}
+                    onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                  />
+                </div>
               </div>
 
               <button 
@@ -1084,6 +1134,27 @@ ${articleData.content}
 
                 {/* Internal Links & Schema */}
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {articleData?.locationAddress && (
+                    <div className="glass-panel rounded-3xl p-6 md:col-span-2">
+                       <label className="text-[10px] font-black text-accent uppercase tracking-widest block mb-4 flex items-center">
+                        <MapPin className="w-3 h-3 mr-2" />
+                        Google Maps Local Signal
+                      </label>
+                      <div className="rounded-xl overflow-hidden grayscale contrast-125 opacity-80 border border-white/5">
+                        <iframe 
+                          width="100%" 
+                          height="250" 
+                          frameBorder="0" 
+                          style={{ border: 0 }}
+                          src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(articleData.locationAddress)}`} 
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                      <p className="text-[9px] text-white/30 mt-3 font-bold uppercase tracking-tighter">
+                        This embed establishes physical relevance for search engines.
+                      </p>
+                    </div>
+                  )}
                   <div className="glass-panel rounded-3xl p-6">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-4">Internal Linking Suggestions</label>
                     <ul className="space-y-2">
