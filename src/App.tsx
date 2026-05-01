@@ -27,6 +27,7 @@ import { marked } from "marked";
 import { supabase } from "./lib/supabase";
 import { User } from "@supabase/supabase-js";
 import Auth from "./components/Auth";
+import About from "./components/About";
 
 declare global {
   interface Window {
@@ -99,7 +100,7 @@ const CITIES = [
 ];
 
 export default function App() {
-  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth">("landing");
+  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth" | "about">("landing");
   const [user, setUser] = useState<User | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -727,6 +728,12 @@ ${articleData.content}
                     <ArrowLeft className="w-4 h-4 mr-2 rotate-180" />
                     Dashboard
                   </button>
+                  <button 
+                    onClick={() => setView("about")}
+                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
+                  >
+                    About & Benefits
+                  </button>
                 </div>
                 <h1 className="text-5xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
                 Generate Local SEO Content <br />
@@ -1197,6 +1204,12 @@ ${articleData.content}
                 >
                   <Settings className="w-5 h-5" />
                 </button>
+                <button 
+                  onClick={() => setView("about")}
+                  className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/50 hover:text-white transition-all text-xs font-bold uppercase tracking-widest"
+                >
+                  About
+                </button>
               </div>
             </div>
 
@@ -1299,6 +1312,16 @@ ${articleData.content}
             className="flex items-center justify-center min-h-screen p-4"
           >
             <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
+          </motion.div>
+        ) : view === "about" ? (
+          <motion.div 
+            key="about"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="min-h-screen"
+          >
+            <About onBack={() => setView("landing")} />
           </motion.div>
         ) : (
           <motion.div 
