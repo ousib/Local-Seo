@@ -62,11 +62,11 @@ export default function About({ onBack }: AboutProps) {
           <Sparkles className="w-4 h-4 mr-2" />
           The Future of Local SEO
         </div>
-        <h1 className="text-5xl font-extrabold tracking-tight mb-8 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
+        <h1 className="text-4xl font-bold tracking-tight mb-8 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
           Empowering Local Businesses with <br />
           <span className="text-accent underline decoration-accent/30 decoration-offset-8">Expert-Level SEO</span>
         </h1>
-        <p className="text-xl text-white/60 font-medium leading-relaxed mb-16 max-w-2xl">
+        <p className="text-lg text-white/60 font-medium leading-relaxed mb-16 max-w-2xl">
           We built this platform to level the playing field. Small businesses shouldn't need a $5,000/month SEO agency budget just to show up on page one of Google.
         </p>
       </motion.div>
@@ -96,11 +96,12 @@ export default function About({ onBack }: AboutProps) {
         className="glass-panel rounded-[40px] p-12 bg-gradient-to-br from-accent/20 to-transparent border border-accent/20 overflow-hidden relative"
       >
         <div className="relative z-10">
-          <h2 className="text-3xl font-extrabold text-white mb-6">Why Subscribe?</h2>
+          <h2 className="text-3xl font-bold text-white mb-6">Why Subscribe?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
             {[
               "Unlimited High-Quality Articles",
               "Priority AI Processing",
+              "Bulk Content Engine (Batch Mode)",
               "Google Maps Embed Generator",
               "Advanced JSON-LD Schema",
               "One-Click Webhook Exporting",
@@ -116,7 +117,7 @@ export default function About({ onBack }: AboutProps) {
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <button 
               onClick={() => onBack()} // In a real app, this would go to upgrade
-              className="w-full sm:w-auto px-10 py-5 bg-accent text-slate-950 rounded-2xl font-black uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg text-sm"
+              className="w-full sm:w-auto px-10 py-5 bg-accent text-slate-950 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg text-sm"
             >
               Start Generating Now
             </button>

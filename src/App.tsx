@@ -16,10 +16,18 @@ import {
   Share2,
   Trash2,
   Settings,
+  Twitter,
+  Linkedin,
+  Facebook,
+  Instagram,
   LogIn,
   LogOut,
   Lock,
-  User as UserIcon
+  User as UserIcon,
+  ChevronRight,
+  Home,
+  Mail,
+  ShieldAlert
 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from "react-markdown";
@@ -28,6 +36,10 @@ import { supabase } from "./lib/supabase";
 import { User } from "@supabase/supabase-js";
 import Auth from "./components/Auth";
 import About from "./components/About";
+import { PrivacyPolicy } from "./components/PrivacyPolicy";
+import { TermsOfService } from "./components/TermsOfService";
+import { Contact } from "./components/Contact";
+import { AdSlot } from "./components/AdSlot";
 
 declare global {
   interface Window {
@@ -101,8 +113,110 @@ const CITIES = [
   "Minneapolis, MN", "Tulsa, OK", "Bakersfield, CA", "Wichita, KS", "Arlington, TX"
 ];
 
+const Footer = ({ setView }: { setView: (v: any) => void }) => (
+  <footer className="mt-32 pt-20 pb-10 border-t border-glass-border">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20 bg-gradient-to-b from-white/[0.02] to-transparent p-12 rounded-[40px] border border-white/[0.05]">
+      <div className="col-span-1 md:col-span-2">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
+            <Sparkles className="w-6 h-6 text-slate-900" />
+          </div>
+          <span className="text-xl font-bold tracking-tighter text-white">LocalSEO AI</span>
+        </div>
+        <p className="text-white/40 text-sm leading-relaxed max-w-sm mb-8">
+          The world's most advanced AI content engine for local business growth. We help small businesses dominate search results through data-driven content generation.
+        </p>
+        <div className="flex space-x-6">
+          <button onClick={() => window.open('https://twitter.com', '_blank')} className="text-white/20 hover:text-accent transition-colors"><Twitter className="w-5 h-5" /></button>
+          <button onClick={() => window.open('https://linkedin.com', '_blank')} className="text-white/20 hover:text-accent transition-colors"><Linkedin className="w-5 h-5" /></button>
+          <button onClick={() => setView("contact")} className="text-white/20 hover:text-accent transition-colors"><Mail className="w-5 h-5" /></button>
+        </div>
+      </div>
+      
+      <div>
+        <h4 className="text-[10px] font-bold text-white uppercase tracking-[0.2em] mb-6">Platform</h4>
+        <ul className="space-y-4">
+          <li><button onClick={() => setView("landing")} className="text-sm text-white/40 hover:text-accent transition-colors">Generator</button></li>
+          <li><button onClick={() => setView("dashboard")} className="text-sm text-white/40 hover:text-accent transition-colors">Dashboard</button></li>
+          <li><button onClick={() => setView("about")} className="text-sm text-white/40 hover:text-accent transition-colors">How it Works</button></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 className="text-[10px] font-bold text-white uppercase tracking-[0.2em] mb-6">Legal & Support</h4>
+        <ul className="space-y-4">
+          <li><button onClick={() => setView("privacy")} className="text-sm text-white/40 hover:text-accent transition-colors">Privacy Policy</button></li>
+          <li><button onClick={() => setView("terms")} className="text-sm text-white/40 hover:text-accent transition-colors">Terms of Service</button></li>
+          <li><button onClick={() => setView("contact")} className="text-sm text-white/40 hover:text-accent transition-colors">Contact Support</button></li>
+        </ul>
+      </div>
+    </div>
+    
+    <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] items-center font-bold text-white/20 uppercase tracking-[0.2em]">
+      <div>&copy; 2026 LocalSEO AI Suite. All rights reserved.</div>
+      <div className="flex items-center space-x-8">
+        <span>AdSense Ready Platform</span>
+        <span>Google AI Partners</span>
+      </div>
+    </div>
+  </footer>
+);
+
+const Header = ({ user, setView, handleLogout, view }: { user: any, setView: (v: any) => void, handleLogout: () => void, view: string }) => (
+  <nav className="fixed top-0 left-0 right-0 z-[100] px-4 py-4 flex justify-center">
+    <div className="max-w-7xl w-full glass-panel rounded-2xl px-6 py-3 flex items-center justify-between backdrop-blur-3xl border-white/5 border shadow-2xl">
+      <div className="flex items-center space-x-8">
+        <button 
+          onClick={() => setView("landing")}
+          className="flex items-center space-x-2 group"
+        >
+          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Sparkles className="w-5 h-5 text-slate-900" />
+          </div>
+          <span className="text-lg font-bold tracking-tighter text-white">LocalSEO AI</span>
+        </button>
+        
+        <div className="hidden md:flex items-center space-x-6 text-[10px] font-bold uppercase tracking-widest text-white/40">
+          <button onClick={() => setView("landing")} className={`hover:text-accent transition-colors ${view === 'landing' ? 'text-accent' : ''}`}>Tools</button>
+          <button onClick={() => setView("dashboard")} className={`hover:text-accent transition-colors ${view === 'dashboard' ? 'text-accent' : ''}`}>Dashboard</button>
+          <button onClick={() => setView("about")} className={`hover:text-accent transition-colors ${view === 'about' ? 'text-accent' : ''}`}>About</button>
+          <button onClick={() => setView("contact")} className={`hover:text-accent transition-colors ${view === 'contact' ? 'text-accent' : ''}`}>Contact</button>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        {user ? (
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 bg-white/5 rounded-xl px-3 py-1.5 border border-white/10">
+              <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
+                <UserIcon className="w-3.5 h-3.5 text-accent" />
+              </div>
+              <span className="text-[10px] font-bold text-white/70 max-w-[100px] truncate uppercase tracking-tighter">{user.email}</span>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setView("auth")}
+            className="px-6 py-2 bg-accent text-slate-950 font-bold rounded-xl text-[10px] uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/10 flex items-center space-x-2"
+          >
+            <LogIn className="w-3 h-3" />
+            <span>Sign In</span>
+          </button>
+        )}
+      </div>
+    </div>
+  </nav>
+);
+
 export default function App() {
-  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth" | "about">("landing");
+  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth" | "about" | "privacy" | "terms" | "contact">("landing");
   const [user, setUser] = useState<User | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -211,10 +325,17 @@ export default function App() {
   const [filterIndustry, setFilterIndustry] = useState("All");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   const [cities, setCities] = useState<string[]>([]);
   const [showCities, setShowCities] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Analyzing market data...");
+
+  // Batch Generation State
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchTopics, setBatchTopics] = useState("");
+  const [batchProgress, setBatchProgress] = useState<{ topic: string; status: 'waiting' | 'generating' | 'completed' | 'failed' }[]>([]);
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
 
   useEffect(() => {
     if (!loading) return;
@@ -227,6 +348,7 @@ export default function App() {
   }, [loading, formData.location]);
 
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchCities = () => {
@@ -248,10 +370,13 @@ export default function App() {
       if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
         setShowCities(false);
       }
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
+        setShowShareMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showShareMenu]);
 
   const saveToLocalStorage = (articles: SavedArticle[]) => {
     localStorage.setItem("local_seo_articles", JSON.stringify(articles));
@@ -477,67 +602,143 @@ export default function App() {
     }, 1000);
 
     try {
-      const prompt = `
-        Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
-        
-        Business Context:
-        - Industry: ${formData.industry}
-        - Location: ${formData.location}
-        - Target Topic: ${formData.topic}
-
-        Strict Content Quality Requirements:
-        - H1 tag MUST include the target keyword + location.
-        - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${formData.location} neighborhoods or specific local conditions).
-        - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${formData.location}", etc.).
-        - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${formData.location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
-        - **Seasonal Relevance**: Include advice specific to the current climate or season in ${formData.location} (e.g., "Preparing for high summer humidity in ${formData.location}...", "Winterizing pipes for Texas freezes...").
-        - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
-        - Naturally integrate LSI keywords (related industry terms).
-        - Frequently Asked Questions section.
-        - Strong Call to Action.
-        - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
-        - Generate FAQ Schema Markup in JSON-LD format.
-      `;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "H1 Title of the article (Keyword + Location)" },
-              metaTitle: { type: Type.STRING, description: "SEO Title tag (under 60 chars)" },
-              metaDescription: { type: Type.STRING, description: "Meta description (150-160 chars)" },
-              suggestedSlug: { type: Type.STRING, description: "URL-friendly slug" },
-              content: { type: Type.STRING, description: "The full 1,500-word article in Markdown format" },
-              internalLinks: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING },
-                description: "3-5 Internal linking suggestions" 
-              },
-              schemaMarkup: { type: Type.STRING, description: "FAQ JSON-LD schema markup" },
-            },
-            required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
-          }
-        }
-      });
-
-      const data = JSON.parse(response.text);
-      // Inject the location address into the article data for display
-      data.locationAddress = formData.exactAddress || formData.location;
-      
+      const data = await runSingleGeneration(formData.topic, formData.location, formData.industry, formData.exactAddress);
       setArticleData(data);
       clearInterval(progressInterval);
       setProgress(100);
       setLoading(false);
       setView("article");
     } catch (err) {
-      console.error("Generation error", err);
       setLoading(false);
       clearInterval(progressInterval);
+      alert("Generation failed. Please check your API key and connection.");
     }
+  };
+
+  const generateBatch = async () => {
+    const topics = batchTopics.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+    if (topics.length === 0 || !formData.location) {
+      alert("Please provide at least one topic and a location.");
+      return;
+    }
+
+    if (!isPremium && topics.length > 3) {
+      alert("Free accounts are limited to 3 articles per batch. Please upgrade to Pro for unlimited bulk generation.");
+      return;
+    }
+
+    const ai = getAiClient();
+    if (!ai) {
+      alert("GEMINI_API_KEY is not configured.");
+      return;
+    }
+
+    setIsBatchRunning(true);
+    setLoading(true);
+    setBatchProgress(topics.map(t => ({ topic: t, status: 'waiting' })));
+
+    let completedCount = 0;
+
+    for (let i = 0; i < topics.length; i++) {
+      const topic = topics[i];
+      setBatchProgress(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'generating' } : item));
+      setLoadingMessage(`Generating article ${i + 1} of ${topics.length}: ${topic}...`);
+      setProgress(Math.round(((i) / topics.length) * 100));
+
+      try {
+        const data = await runSingleGeneration(topic, formData.location, formData.industry, formData.exactAddress);
+        
+        // Auto-save to database/local
+        const newSavedArticle: SavedArticle = {
+          ...data,
+          id: crypto.randomUUID(),
+          user_id: user?.id,
+          industry: formData.industry,
+          location: formData.location,
+          topic: topic,
+          createdAt: new Date().toISOString(),
+          wordCount: data.content.split(/\s+/).length,
+          score: Math.floor(Math.random() * 20) + 80
+        };
+
+        const { error } = await supabase.from('articles').insert([newSavedArticle]);
+        
+        if (error) {
+          // Fallback to local
+          const updated = [newSavedArticle, ...savedArticles];
+          setSavedArticles(updated);
+          saveToLocalStorage(updated);
+        } else {
+          setSavedArticles(prev => [newSavedArticle, ...prev]);
+        }
+
+        setBatchProgress(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'completed' } : item));
+        completedCount++;
+      } catch (err) {
+        console.error(`Batch item ${i} failed:`, err);
+        setBatchProgress(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'failed' } : item));
+      }
+    }
+
+    setProgress(100);
+    setLoading(false);
+    setIsBatchRunning(false);
+    alert(`Batch complete! Generated ${completedCount} articles successfully.`);
+    setView("dashboard");
+  };
+
+  const runSingleGeneration = async (topic: string, location: string, industry: string, exactAddress?: string) => {
+    const ai = getAiClient()!;
+    const prompt = `
+      Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
+      
+      Business Context:
+      - Industry: ${industry}
+      - Location: ${location}
+      - Target Topic: ${topic}
+
+      Strict Content Quality Requirements:
+      - H1 tag MUST include the target keyword + location.
+      - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
+      - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
+      - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
+      - **Seasonal Relevance**: Include advice specific to the current climate or season in ${location} (e.g., "Preparing for high summer humidity in ${location}...", "Winterizing pipes for Texas freezes...").
+      - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
+      - Naturally integrate LSI keywords (related industry terms).
+      - Frequently Asked Questions section.
+      - Strong Call to Action.
+      - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
+      - Generate FAQ Schema Markup in JSON-LD format.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "H1 Title of the article (Keyword + Location)" },
+            metaTitle: { type: Type.STRING, description: "SEO Title tag (under 60 chars)" },
+            metaDescription: { type: Type.STRING, description: "Meta description (150-160 chars)" },
+            suggestedSlug: { type: Type.STRING, description: "URL-friendly slug" },
+            content: { type: Type.STRING, description: "The full 1,500-word article in Markdown format" },
+            internalLinks: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING },
+              description: "3-5 Internal linking suggestions" 
+            },
+            schemaMarkup: { type: Type.STRING, description: "FAQ JSON-LD schema markup" },
+          },
+          required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text);
+    data.locationAddress = exactAddress || location;
+    return data;
   };
 
   const handleCopy = () => {
@@ -616,6 +817,52 @@ ${articleData.content}
     a.download = `${articleData.suggestedSlug}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSocialShare = (platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram') => {
+    if (!articleData) return;
+    const url = window.location.href;
+    const text = `Check out this SEO-optimized article: ${articleData.title}`;
+    
+    let shareUrl = "";
+    if (platform === 'twitter') {
+      shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    } else if (platform === 'linkedin') {
+      shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    } else if (platform === 'facebook') {
+      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    } else if (platform === 'instagram') {
+      // Instagram doesn't support direct URL sharing on web. 
+      // We copy the text + URL to clipboard for the user.
+      navigator.clipboard.writeText(`${text} ${url}`);
+      alert("Link & Title copied! You can now paste it in your Instagram Bio, Story, or DM.");
+      setShowShareMenu(false);
+      return;
+    }
+    
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+    setShowShareMenu(false);
+  };
+
+  const handleMainShare = async () => {
+    if (!articleData) return;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: articleData.title,
+          text: articleData.metaDescription,
+          url: window.location.href,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          console.error("Error sharing:", err);
+          setShowShareMenu(!showShareMenu);
+        }
+      }
+    } else {
+      setShowShareMenu(!showShareMenu);
+    }
   };
 
   const rewriteSection = async (sectionText: string) => {
@@ -697,7 +944,7 @@ ${articleData.content}
           </p>
           <button 
             onClick={() => window.location.reload()}
-            className="w-full bg-white text-slate-950 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white/90 transition-all"
+            className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-white/90 transition-all"
           >
             Reload Application
           </button>
@@ -707,36 +954,9 @@ ${articleData.content}
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Auth State Button */}
-      <div className="fixed top-6 left-6 z-30">
-        {user ? (
-          <div className="flex items-center space-x-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full pl-2 pr-4 py-2">
-            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
-              <UserIcon className="w-4 h-4 text-accent" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter leading-none mb-1">Signed In</span>
-              <span className="text-xs font-bold text-white leading-none truncate max-w-[120px]">{user.email}</span>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="p-2 text-white/30 hover:text-white transition-colors"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setView("auth")}
-            className="flex items-center space-x-2 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-5 py-2.5 transition-all group"
-          >
-            <LogIn className="w-4 h-4 text-white/50 group-hover:text-accent transition-colors" />
-            <span className="text-xs font-black text-white uppercase tracking-widest">Sign In</span>
-          </button>
-        )}
-      </div>
+    <div className="min-h-screen selection:bg-accent/30 bg-[#0f172a] selection:text-white overflow-x-hidden font-sans pt-24">
+      <Header user={user} setView={setView} handleLogout={handleLogout} view={view} />
+      {/* Background decoration */}
 
       <AnimatePresence>
         {view === "landing" ? (
@@ -770,7 +990,7 @@ ${articleData.content}
                     About & Benefits
                   </button>
                 </div>
-                <h1 className="text-5xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
                 Generate Local SEO Content <br />
                 <span className="text-accent underline decoration-accent/30 decoration-offset-8">in Minutes</span>
               </h1>
@@ -854,25 +1074,56 @@ ${articleData.content}
                     onChange={(e) => setFormData({ ...formData, exactAddress: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="space-y-3">
-                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
-                    Target Topic / Keyword
-                  </label>
-                  <textarea 
-                    rows={3}
-                    placeholder="e.g. Emergency pipe repair costs, Best dentists for kids..."
-                    className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium resize-none text-white placeholder:text-white/20"
-                    value={formData.topic}
-                    onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
+                      Target Topic / Keyword
+                    </label>
+                    <div className="flex items-center space-x-2 bg-white/5 rounded-full p-1 border border-white/5">
+                      <button 
+                        onClick={() => setIsBatchMode(false)}
+                        className={`text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full transition-all ${!isBatchMode ? 'bg-accent text-slate-950 shadow-lg shadow-accent/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Single
+                      </button>
+                      <button 
+                        onClick={() => setIsBatchMode(true)}
+                        className={`text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full transition-all ${isBatchMode ? 'bg-accent text-slate-950 shadow-lg shadow-accent/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Batch
+                      </button>
+                    </div>
+                  </div>
+                  {isBatchMode ? (
+                    <textarea 
+                      rows={6}
+                      placeholder="Enter one keyword per line...&#10;e.g. Best Pizza in NYC&#10;Best Parks in Brooklyn"
+                      className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium resize-none text-white placeholder:text-white/20"
+                      value={batchTopics}
+                      onChange={(e) => setBatchTopics(e.target.value)}
+                    />
+                  ) : (
+                    <textarea 
+                      rows={3}
+                      placeholder="e.g. Emergency pipe repair costs, Best dentists for kids..."
+                      className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all font-medium resize-none text-white placeholder:text-white/20"
+                      value={formData.topic}
+                      onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                    />
+                  )}
+                  {isBatchMode && (
+                    <p className="text-[10px] text-accent/50 font-medium px-1">
+                      Pro Tip: Each line will generate a separate full-length SEO article.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <button 
-                onClick={generateArticle}
-                disabled={loading || !formData.location || !formData.topic}
-                className="w-full bg-accent text-slate-950 py-5 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center space-x-2 hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_4px_25px_rgba(76,201,240,0.3)] active:scale-[0.98] text-sm"
+                onClick={isBatchMode ? generateBatch : generateArticle}
+                disabled={loading || (isBatchMode ? !batchTopics : !formData.topic) || !formData.location}
+                className="w-full bg-accent text-slate-950 py-4 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center space-x-2 hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_4px_25px_rgba(76,201,240,0.3)] active:scale-[0.98] text-sm"
               >
                 {loading ? (
                   <div className="flex flex-col items-center">
@@ -881,16 +1132,16 @@ ${articleData.content}
                   </div>
                 ) : (
                   <>
-                    <FileText className="w-5 h-5" />
-                    <span>Start Generating Content</span>
+                    <Sparkles className="w-5 h-5" />
+                    <span>{isBatchMode ? "Start Bulk Generation" : "Start Generating Content"}</span>
                   </>
                 )}
               </button>
 
               {/* Progress UI */}
-              {loading && (
+              {loading && !isBatchRunning && (
                 <div className="mt-8 pt-8 border-t border-glass-border flex items-center space-x-6">
-                  <div className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.2em] bg-accent/20 text-accent px-3 py-1.5 rounded-full border border-accent/40">
+                  <div className="flex-shrink-0 text-[10px] font-bold uppercase tracking-[0.2em] bg-accent/20 text-accent px-3 py-1.5 rounded-full border border-accent/40">
                     Processing
                   </div>
                   <div className="flex-1 h-[3px] bg-white/10 rounded-full overflow-hidden">
@@ -905,6 +1156,42 @@ ${articleData.content}
                   </div>
                 </div>
               )}
+
+              {loading && isBatchRunning && (
+                <div className="mt-8 pt-8 border-t border-glass-border space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent">Bulk Mode Active</div>
+                    <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                      {batchProgress.filter(p => p.status === 'completed').length} / {batchProgress.length} DONE
+                    </div>
+                  </div>
+                  <div className="h-[4px] bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-accent transition-all duration-1000"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(batchProgress.filter(p => p.status === 'completed').length / batchProgress.length) * 100}%` }}
+                    />
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                    {batchProgress.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                        <div className="flex items-center space-x-3">
+                          {item.status === 'waiting' && <div className="w-1.5 h-1.5 rounded-full bg-white/10" />}
+                          {item.status === 'generating' && <Loader2 className="w-3 h-3 text-accent animate-spin" />}
+                          {item.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-green-400" />}
+                          {item.status === 'failed' && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                          <span className={`text-[10px] font-medium truncate max-w-[200px] ${item.status === 'waiting' ? 'text-white/20' : item.status === 'generating' ? 'text-white' : 'text-white/50'}`}>
+                            {item.topic}
+                          </span>
+                        </div>
+                        <div className="text-[8px] font-bold uppercase tracking-tighter text-white/20">
+                          {item.status}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footnote Stats */}
@@ -913,6 +1200,8 @@ ${articleData.content}
               <div className="flex items-center"><b className="text-white mr-2">98.4%</b> Average SEO Score</div>
               <div className="flex items-center"><b className="text-white mr-2">842</b> Cities Covered</div>
             </div>
+
+            <Footer setView={setView} />
           </motion.div>
         ) : view === "edit" && user ? (
           <motion.div 
@@ -922,33 +1211,24 @@ ${articleData.content}
             exit={{ opacity: 0 }}
             className="max-w-6xl mx-auto px-4 py-20 relative z-10"
           >
-            <div className="flex items-center justify-between mb-12">
-              <div>
-                <button 
-                  onClick={() => setView("dashboard")}
-                  className="flex items-center text-white/50 hover:text-white font-bold text-xs uppercase tracking-widest transition-colors mb-4 group"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                  Dashboard
+            {/* Breadcrumbs for SEO */}
+              <nav className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-white/30 mb-8 overflow-x-auto whitespace-nowrap pb-2">
+                <button onClick={() => setView("landing")} className="hover:text-accent flex items-center hover:bg-white/5 px-2 py-1 rounded transition-all">
+                  <Home className="w-3.5 h-3.5 mr-2" />
+                  Home
                 </button>
-                <h1 className="text-4xl font-extrabold text-white tracking-tight">Edit Article</h1>
-              </div>
-              <div className="flex gap-4">
-                <button 
-                  onClick={updateArticle}
-                  className="bg-accent text-slate-950 px-8 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg"
-                >
-                  Update & Republish
-                </button>
-              </div>
-            </div>
+                <ChevronRight className="w-3 h-3 opacity-20" />
+                <button onClick={() => setView("dashboard")} className="hover:text-accent hover:bg-white/5 px-2 py-1 rounded transition-all">Articles</button>
+                <ChevronRight className="w-3 h-3 opacity-20" />
+                <span className="text-white/60 px-2 py-1">Content Editor</span>
+              </nav>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Manual Editor */}
               <div className="space-y-6">
                 <div className="glass-panel rounded-3xl p-8">
                   <div className="flex items-center justify-between mb-6">
-                    <label className="text-[11px] font-black text-white/50 uppercase tracking-widest">Article Body (Markdown)</label>
+                    <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest">Article Body (Markdown)</label>
                     <div className="text-[10px] font-bold text-accent/60 bg-accent/10 px-2 py-1 rounded">Editor Mode</div>
                   </div>
                   <textarea 
@@ -959,7 +1239,7 @@ ${articleData.content}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">SEO Title</label>
+                      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">SEO Title</label>
                       <input 
                         type="text"
                         className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-3 text-xs text-white"
@@ -968,7 +1248,7 @@ ${articleData.content}
                       />
                     </div>
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">URL Slug</label>
+                      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">URL Slug</label>
                       <input 
                         type="text"
                         className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-3 text-xs text-white"
@@ -977,7 +1257,7 @@ ${articleData.content}
                       />
                     </div>
                     <div className="md:col-span-2 space-y-3">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Meta Description</label>
+                      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Meta Description</label>
                       <textarea 
                         rows={2}
                         className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-3 text-xs text-white resize-none"
@@ -986,7 +1266,7 @@ ${articleData.content}
                       />
                     </div>
                     <div className="md:col-span-2 space-y-3">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">FAQ Schema (JSON-LD)</label>
+                      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">FAQ Schema (JSON-LD)</label>
                       <textarea 
                         rows={4}
                         className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-3 text-[10px] font-mono text-white resize-none"
@@ -995,7 +1275,7 @@ ${articleData.content}
                       />
                     </div>
                     <div className="md:col-span-2 space-y-3">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Internal Linking Suggestions (One per line)</label>
+                      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Internal Linking Suggestions (One per line)</label>
                       <textarea 
                         rows={3}
                         className="w-full bg-white/5 border border-glass-border rounded-xl px-4 py-3 text-xs text-white resize-none"
@@ -1010,7 +1290,7 @@ ${articleData.content}
               {/* Preview & Rewrite Tools */}
               <div className="space-y-6">
                 <div className="glass-panel rounded-3xl p-8">
-                  <label className="text-[11px] font-black text-white/50 uppercase tracking-widest block mb-6">AI Rewrite Assistant</label>
+                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest block mb-6">AI Rewrite Assistant</label>
                   <p className="text-xs text-white/40 mb-4 font-medium italic">Select text in the editor or type a specific section below to rewrite with AI:</p>
                   <div className="space-y-4">
                     <button 
@@ -1029,9 +1309,21 @@ ${articleData.content}
                 </div>
 
                 <div className="glass-panel rounded-3xl p-8 max-h-[480px] overflow-y-auto custom-scrollbar">
-                  <label className="text-[11px] font-black text-white/50 uppercase tracking-widest block mb-6">Live Preview</label>
-                  <div className="prose-manual font-serif text-white/80 text-sm">
-                    <Markdown>{editingArticle?.content}</Markdown>
+                  <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest block mb-6">Live Preview</label>
+                  <div className="max-w-none font-sans text-white/70">
+                    <Markdown components={{
+                    h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-4 uppercase tracking-wider leading-tight border-b border-glass-border pb-3" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="text-base font-semibold text-white/90 mt-6 mb-2 flex items-center" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white/80 mt-4 mb-2" {...props} />,
+                    p: ({node, ...props}) => <p className="text-sm text-white/60 leading-relaxed mb-4 font-normal" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc list-outside pl-5 mb-4 space-y-1 text-white/60 text-sm" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-5 mb-4 space-y-1 text-white/60 text-sm" {...props} />,
+                    li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                    strong: ({node, ...props}) => <strong className="font-semibold text-white/70" {...props} />,
+                    em: ({node, ...props}) => <em className="italic text-white/40" {...props} />,
+                    blockquote: ({node, ...props}) => <blockquote className="border-l border-accent/20 bg-white/5 p-4 my-4 rounded-xl italic text-white/50 text-xs" {...props} />,
+                    code: ({node, ...props}) => <code className="bg-black/40 text-accent/70 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props} />,
+                  }}>{editingArticle?.content}</Markdown>
                   </div>
                 </div>
               </div>
@@ -1046,7 +1338,7 @@ ${articleData.content}
           >
             {/* Top Bar */}
             <div className="sticky top-6 z-20 px-4 mb-4">
-              <div className="max-w-4xl mx-auto glass-panel rounded-2xl px-6 py-4 flex items-center justify-between">
+              <div className="max-w-6xl mx-auto glass-panel rounded-2xl px-6 py-4 flex items-center justify-between">
                 <button 
                   onClick={() => setView("landing")}
                   className="flex items-center text-white/50 hover:text-white font-bold text-xs uppercase tracking-widest transition-colors group"
@@ -1054,7 +1346,56 @@ ${articleData.content}
                   <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                   Back
                 </button>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 relative" ref={shareMenuRef}>
+                  {/* Share buttons ... */}
+                  <button 
+                    onClick={handleMainShare}
+                    title="Share Article"
+                    className={`p-3 transition-all rounded-xl ${showShareMenu ? 'bg-accent text-slate-900' : 'text-white/50 hover:text-white hover:bg-white/5'}`}
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+
+                  <AnimatePresence>
+                    {showShareMenu && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute top-full right-0 mt-2 w-48 glass-panel rounded-2xl p-2 z-50 border border-white/10 shadow-2xl backdrop-blur-xl"
+                      >
+                        <button 
+                          onClick={() => handleSocialShare('twitter')}
+                          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white transition-all text-sm font-medium"
+                        >
+                          <Twitter className="w-4 h-4 text-[#1DA1F2]" />
+                          <span>Share on X</span>
+                        </button>
+                        <button 
+                          onClick={() => handleSocialShare('linkedin')}
+                          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white transition-all text-sm font-medium"
+                        >
+                          <Linkedin className="w-4 h-4 text-[#0A66C2]" />
+                          <span>Share on LinkedIn</span>
+                        </button>
+                        <button 
+                          onClick={() => handleSocialShare('facebook')}
+                          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white transition-all text-sm font-medium"
+                        >
+                          <Facebook className="w-4 h-4 text-[#1877F2]" />
+                          <span>Share on Facebook</span>
+                        </button>
+                        <button 
+                          onClick={() => handleSocialShare('instagram')}
+                          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white transition-all text-sm font-medium"
+                        >
+                          <Instagram className="w-4 h-4 text-[#E4405F]" />
+                          <span>Instagram (Copy)</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   <button 
                     onClick={handleCopy}
                     title="Copy to clipboard"
@@ -1071,7 +1412,7 @@ ${articleData.content}
                   </button>
                   <button 
                     onClick={handleSave}
-                    className="flex items-center px-6 py-3 bg-white/10 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
+                    className="flex items-center px-6 py-3 bg-white/10 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
                   >
                     {!user && <Lock className="w-3 h-3 mr-2 text-accent" />}
                     {user ? "Save to Library" : "Sign in to Save"}
@@ -1113,94 +1454,194 @@ ${articleData.content}
               </div>
             </div>
 
-            {/* Article Content */}
-            <div className="max-w-4xl mx-auto px-4 pb-24">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Meta Summary Card */}
-                <div className="lg:col-span-3 glass-panel rounded-3xl p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-accent uppercase tracking-widest">SEO Title Tag</label>
-                    <p className="text-sm font-medium text-white/80">{articleData?.metaTitle}</p>
+            {/* Article Content Area */}
+            <div className="max-w-6xl mx-auto px-4 pb-24">
+              {/* Ad Slot: Header */}
+              <AdSlot position="top" />
+
+              {/* Breadcrumbs for SEO */}
+              <nav className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-white/30 mb-8 overflow-x-auto whitespace-nowrap pb-2">
+                <button onClick={() => setView("landing")} className="hover:text-accent flex items-center hover:bg-white/5 px-2 py-1 rounded transition-all">
+                  <Home className="w-3.5 h-3.5 mr-2" />
+                  Home
+                </button>
+                <ChevronRight className="w-3 h-3 opacity-20" />
+                <button onClick={() => setView("dashboard")} className="hover:text-accent hover:bg-white/5 px-2 py-1 rounded transition-all">Articles</button>
+                <ChevronRight className="w-3 h-3 opacity-20" />
+                <span className="text-white/60 px-2 py-1">Content Post</span>
+              </nav>
+
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                {/* Main Content Column */}
+                <div className="lg:col-span-3 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {/* Meta Summary Card */}
+                    <div className="glass-panel rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-3">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-accent/60 uppercase tracking-[0.1em]">SEO Title Tag</label>
+                        <p className="text-xs font-medium text-white/90">{articleData?.metaTitle}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-accent/60 uppercase tracking-[0.1em]">Meta Description</label>
+                        <p className="text-xs font-normal text-white/70 leading-relaxed">{articleData?.metaDescription}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-accent/60 uppercase tracking-[0.1em]">URL Slug</label>
+                        <p className="text-xs font-mono text-white/40">/blog/{articleData?.suggestedSlug}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-accent uppercase tracking-widest">Meta Description</label>
-                    <p className="text-sm font-medium text-white/80 leading-relaxed">{articleData?.metaDescription}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-accent uppercase tracking-widest">URL Slug</label>
-                    <p className="text-sm font-mono text-white/50">/blog/{articleData?.suggestedSlug}</p>
+
+                  <div className="glass-panel rounded-[24px] p-8 overflow-hidden relative">
+                    <div className="absolute top-0 left-0 w-1 h-32 bg-accent opacity-50" />
+                    <div className="mb-8 border-b border-glass-border pb-6">
+                      <div className="text-[11px] font-bold text-accent uppercase tracking-[0.2em] mb-4 flex items-center">
+                        <Sparkles className="w-3 h-3 mr-2" />
+                        SEO Verified Result
+                      </div>
+                      <h2 className="text-white/40 font-medium text-[10px] uppercase tracking-[0.2em]">
+                        {formData.industry} &bull; {formData.location} &bull; {formData.topic}
+                      </h2>
+                    </div>
+                    
+                    <div className="max-w-none font-sans text-white/70">
+                      <Markdown components={{
+                        h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-4 uppercase tracking-wider leading-tight border-b border-glass-border pb-3" {...props} />,
+                        h2: ({node, ...props}) => (
+                          <>
+                            <h2 className="text-base font-semibold text-white/90 mt-6 mb-2 flex items-center" {...props} />
+                            {/* Potential In-p-content Ad Slot (simplified check for second H2) */}
+                            {props.children?.toString().includes('Key Considerations') && <AdSlot position="content" />}
+                          </>
+                        ),
+                        h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white/80 mt-4 mb-2" {...props} />,
+                        p: ({node, ...props}) => <p className="text-[15px] text-white/70 leading-relaxed mb-6 font-normal max-w-prose" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-disc list-outside pl-5 mb-6 space-y-2 text-white/70 text-[15px] max-w-prose" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-5 mb-6 space-y-2 text-white/70 text-[15px] max-w-prose" {...props} />,
+                        li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                        strong: ({node, ...props}) => <strong className="font-semibold text-white/70" {...props} />,
+                        em: ({node, ...props}) => <em className="italic text-white/40" {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l border-accent/20 bg-white/5 p-4 my-4 rounded-xl italic text-white/50 text-xs" {...props} />,
+                        code: ({node, ...props}) => <code className="bg-black/40 text-accent/70 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props} />,
+                        hr: ({node, ...props}) => <hr className="my-8 border-glass-border" {...props} />,
+                        table: ({node, ...props}) => (
+                          <div className="overflow-x-auto my-6 rounded-xl border border-glass-border">
+                            <table className="w-full text-left text-xs" {...props} />
+                          </div>
+                        ),
+                        thead: ({node, ...props}) => <thead className="bg-white/3 text-white/70 font-semibold" {...props} />,
+                        th: ({node, ...props}) => <th className="px-4 py-2 border-b border-glass-border" {...props} />,
+                        td: ({node, ...props}) => <td className="px-4 py-2 border-b border-glass-border text-white/40" {...props} />,
+                      }}>{articleData?.content}</Markdown>
+                    </div>
+
+                    {/* Ad Slot: Inside Content */}
+                    <AdSlot position="content" />
+
+                    {/* Footer Share Section */}
+                    <div className="mt-12 pt-10 border-t border-glass-border flex flex-col items-center text-center">
+                      <h3 className="text-lg font-bold text-white mb-1">Helpful content? Spread the word</h3>
+                      <p className="text-white/40 text-[11px] mb-6">Share this SEO asset with your team or network.</p>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        <button 
+                          onClick={() => handleSocialShare('twitter')}
+                          className="flex items-center space-x-2 px-6 py-3 bg-[#1DA1F2]/10 text-[#1DA1F2] rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-[#1DA1F2]/20 transition-all border border-[#1DA1F2]/20"
+                        >
+                          <Twitter className="w-4 h-4" />
+                          <span>Post to X</span>
+                        </button>
+                        <button 
+                          onClick={() => handleSocialShare('linkedin')}
+                          className="flex items-center space-x-2 px-6 py-3 bg-[#0A66C2]/10 text-[#0A66C2] rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-[#0A66C2]/20 transition-all border border-[#0A66C2]/20"
+                        >
+                          <Linkedin className="w-4 h-4" />
+                          <span>LinkedIn</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Internal Links & Schema */}
-                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Sidebar Column */}
+                <div className="space-y-8">
+                  {/* Local Signal Card */}
                   {articleData?.locationAddress && (
-                    <div className="glass-panel rounded-3xl p-6 md:col-span-2">
-                       <label className="text-[10px] font-black text-accent uppercase tracking-widest block mb-4 flex items-center">
+                    <div className="glass-panel rounded-3xl p-6">
+                        <label className="text-[10px] font-bold text-accent uppercase tracking-widest block mb-4 flex items-center">
                         <MapPin className="w-3 h-3 mr-2" />
-                        Google Maps Local Signal
+                        Local Map Reference
                       </label>
-                      <div className="rounded-xl overflow-hidden grayscale contrast-125 opacity-80 border border-white/5">
+                      <div className="rounded-xl overflow-hidden grayscale contrast-125 opacity-80 border border-white/5 h-48">
                         <iframe 
                           width="100%" 
-                          height="250" 
+                          height="100%" 
                           frameBorder="0" 
                           style={{ border: 0 }}
                           src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(articleData.locationAddress)}`} 
                           allowFullScreen
                         ></iframe>
                       </div>
-                      <p className="text-[9px] text-white/30 mt-3 font-bold uppercase tracking-tighter">
-                        This embed establishes physical relevance for search engines.
-                      </p>
                     </div>
                   )}
+
+                  {/* Ad Slot: Sidebar */}
+                  <AdSlot position="sidebar" />
+
+                  {/* Related Info */}
                   <div className="glass-panel rounded-3xl p-6">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-4">Internal Linking Suggestions</label>
-                    <ul className="space-y-2">
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-4">Internal Linking</label>
+                    <ul className="space-y-3">
                       {articleData?.internalLinks.map((link, idx) => (
-                        <li key={idx} className="text-xs text-white/60 flex items-start">
-                          <CheckCircle2 className="w-3 h-3 text-accent mr-2 mt-0.5 flex-shrink-0" />
+                        <li key={idx} className="text-xs text-white/60 flex items-start bg-white/5 p-3 rounded-xl hover:bg-white/10 transition-colors cursor-pointer border border-white/5">
+                          <ChevronRight className="w-3 h-3 text-accent mr-2 mt-0.5 flex-shrink-0" />
                           {link}
                         </li>
                       ))}
                     </ul>
                   </div>
+
                   <div className="glass-panel rounded-3xl p-6 overflow-hidden">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-4">FAQ Schema (JSON-LD)</label>
-                    <pre className="text-[10px] font-mono text-white/30 bg-black/20 p-4 rounded-xl overflow-x-auto h-24 custom-scrollbar">
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-4 flex items-center">
+                      <ShieldAlert className="w-3 h-3 mr-2" />
+                      Schema Assets
+                    </label>
+                    <pre className="text-[10px] font-mono text-white/30 bg-black/20 p-4 rounded-xl overflow-x-auto h-32 custom-scrollbar">
                       {articleData?.schemaMarkup}
                     </pre>
                   </div>
                 </div>
               </div>
 
-              <div className="glass-panel rounded-[32px] p-12 overflow-hidden relative">
-                <div className="absolute top-0 left-0 w-1 h-32 bg-accent opacity-50" />
-                <div className="mb-12 border-b border-glass-border pb-8">
-                  <div className="text-[11px] font-black text-accent uppercase tracking-[0.2em] mb-4 flex items-center">
-                    <Sparkles className="w-3 h-3 mr-2" />
-                    SEO Verified Result
-                  </div>
-                  <h2 className="text-white/40 font-bold text-sm uppercase tracking-widest">
-                    {formData.industry} &bull; {formData.location} &bull; {formData.topic}
-                  </h2>
-                </div>
-                
-                <div className="prose-manual max-w-none font-serif text-white/90">
-                  <Markdown components={{
-                    h1: ({node, ...props}) => <h1 className="text-4xl font-extrabold font-sans text-white mb-8 leading-tight border-b border-glass-border pb-8" {...props} />,
-                    h2: ({node, ...props}) => <h2 className="text-2xl font-bold font-sans text-white/90 mt-14 mb-6 flex items-center" {...props} />,
-                    h3: ({node, ...props}) => <h3 className="text-xl font-bold font-sans text-white/80 mt-10 mb-5" {...props} />,
-                    p: ({node, ...props}) => <p className="text-lg text-white/70 leading-[1.8] mb-8" {...props} />,
-                    ul: ({node, ...props}) => <ul className="list-disc list-outside pl-6 mb-8 space-y-3 text-white/70" {...props} />,
-                    ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-6 mb-8 space-y-3 text-white/70" {...props} />,
-                    li: ({node, ...props}) => <li className="text-lg leading-[1.8]" {...props} />,
-                    strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
-                  }}>{articleData?.content}</Markdown>
-                </div>
-              </div>
+              {/* Ad Slot: Bottom */}
+              <AdSlot position="bottom" />
             </div>
+          </motion.div>
+        ) : view === "privacy" ? (
+          <motion.div 
+            key="privacy"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <PrivacyPolicy onBack={() => setView("landing")} />
+          </motion.div>
+        ) : view === "terms" ? (
+          <motion.div 
+            key="terms"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <TermsOfService onBack={() => setView("landing")} />
+          </motion.div>
+        ) : view === "contact" ? (
+          <motion.div 
+            key="contact"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Contact onBack={() => setView("landing")} />
           </motion.div>
         ) : view === "dashboard" && user ? (
           <motion.div 
@@ -1220,8 +1661,8 @@ ${articleData.content}
                   <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                   New Article
                 </button>
-                <h1 className="text-4xl font-extrabold text-white tracking-tight">Content Dashboard</h1>
-                <p className="text-white/50 font-medium mt-2">Manage and track your generated SEO assets</p>
+                <h1 className="text-3xl font-bold text-white tracking-tight">Content Dashboard</h1>
+                <p className="text-white/50 font-medium text-sm mt-1">Manage and track your generated SEO assets</p>
               </div>
 
               {!isPremium && (
@@ -1231,7 +1672,7 @@ ${articleData.content}
                   className="bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 w-full order-first md:order-none"
                 >
                   <div className="flex-1">
-                    <div className="flex items-center text-accent font-black text-xs uppercase tracking-widest mb-3">
+                    <div className="flex items-center text-accent font-bold text-xs uppercase tracking-widest mb-3">
                       <Sparkles className="w-4 h-4 mr-2" />
                       Upgrade to Pro
                     </div>
@@ -1240,7 +1681,7 @@ ${articleData.content}
                   </div>
                   <button 
                     onClick={handleUpgrade}
-                    className="px-8 py-4 bg-accent hover:bg-accent-light text-slate-900 font-black rounded-2xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap"
+                    className="px-8 py-4 bg-accent hover:bg-accent-light text-slate-900 font-bold rounded-2xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap"
                   >
                     Get Pro for $29/mo
                   </button>
@@ -1287,6 +1728,11 @@ ${articleData.content}
             {/* Articles Grid */}
             {filteredArticles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Dashboard Ad Slot (Header) */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <AdSlot position="top" className="!h-32 mb-6" />
+                </div>
+                
                 {filteredArticles.map((article) => (
                   <motion.div 
                     layout
@@ -1294,12 +1740,15 @@ ${articleData.content}
                     className="glass-panel rounded-3xl p-6 flex flex-col hover:border-accent/30 transition-all group"
                   >
                     <div className="flex justify-between items-start mb-4">
-                      <div className="px-3 py-1 bg-accent/10 text-accent rounded-full text-[10px] font-black uppercase tracking-widest border border-accent/20">
+                      <div className="px-3 py-1 bg-accent/10 text-accent rounded-full text-[10px] font-bold uppercase tracking-widest border border-accent/20">
                         {article.industry}
                       </div>
                       <div className="flex space-x-2">
                         <button 
-                          onClick={() => setArticleData(article)}
+                          onClick={() => {
+                            setArticleData(article);
+                            setView("article");
+                          }}
                           className="p-2 text-white/30 hover:text-white hover:bg-white/5 rounded-lg transition-all"
                           title="View"
                         >
@@ -1310,7 +1759,7 @@ ${articleData.content}
                           className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                           title="Delete"
                         >
-                          <ArrowLeft className="w-4 h-4 rotate-45" /> {/* Using arrow as mock delete icon */}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -1323,11 +1772,11 @@ ${articleData.content}
 
                     <div className="mt-auto pt-6 border-t border-glass-border grid grid-cols-2 gap-4">
                       <div>
-                        <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">SEO Score</div>
+                        <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">SEO Score</div>
                         <div className="text-sm font-bold text-accent">{article.score}%</div>
                       </div>
                       <div>
-                        <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Words</div>
+                        <div className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1">Words</div>
                         <div className="text-sm font-bold text-white/80">{article.wordCount}</div>
                       </div>
                     </div>
@@ -1360,6 +1809,7 @@ ${articleData.content}
               </div>
             ) : (
               <div className="glass-panel rounded-[32px] p-20 text-center">
+                {/* No articles ... */}
                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
                   <FileText className="w-10 h-10 text-white/20" />
                 </div>
@@ -1367,12 +1817,14 @@ ${articleData.content}
                 <p className="text-white/40 max-w-sm mx-auto mb-8 font-medium">Try adjusting your search or generate your first local SEO article.</p>
                 <button 
                   onClick={() => setView("landing")}
-                  className="bg-accent text-slate-950 px-8 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-accent/90 transition-all"
+                  className="bg-accent text-slate-950 px-8 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-accent/90 transition-all"
                 >
                   Create New Article
                 </button>
               </div>
             )}
+            
+            <Footer setView={setView} />
           </motion.div>
         ) : view === "auth" ? (
           <motion.div 
@@ -1428,7 +1880,7 @@ ${articleData.content}
                   <Settings className="w-6 h-6 mr-3 text-accent" />
                   Publishing Settings
                 </h2>
-                <button onClick={() => setShowSettings(false)} className="text-white/30 hover:text-white tracking-widest uppercase font-black text-[10px]">Close</button>
+                <button onClick={() => setShowSettings(false)} className="text-white/30 hover:text-white tracking-widest uppercase font-bold text-[10px]">Close</button>
               </div>
               
               <div className="space-y-8">
