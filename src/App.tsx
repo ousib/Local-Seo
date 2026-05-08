@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Building2, 
@@ -39,7 +40,12 @@ import About from "./components/About";
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { TermsOfService } from "./components/TermsOfService";
 import { Contact } from "./components/Contact";
+import { Help } from "./components/Help";
 import { AdSlot } from "./components/AdSlot";
+import { BlogPostComponent as BlogPost } from "./components/BlogPost";
+import { Blog } from "./components/Blog";
+import { blogPosts } from "./data/blogPosts";
+import { BlogPost as BlogPostType } from "./types";
 
 declare global {
   interface Window {
@@ -113,7 +119,7 @@ const CITIES = [
   "Minneapolis, MN", "Tulsa, OK", "Bakersfield, CA", "Wichita, KS", "Arlington, TX"
 ];
 
-const Footer = ({ setView }: { setView: (v: any) => void }) => (
+const Footer = () => (
   <footer className="mt-32 pt-20 pb-10 border-t border-glass-border">
     <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20 bg-gradient-to-b from-white/[0.02] to-transparent p-12 rounded-[40px] border border-white/[0.05]">
       <div className="col-span-1 md:col-span-2">
@@ -129,25 +135,27 @@ const Footer = ({ setView }: { setView: (v: any) => void }) => (
         <div className="flex space-x-6">
           <button onClick={() => window.open('https://twitter.com', '_blank')} className="text-white/20 hover:text-accent transition-colors"><Twitter className="w-5 h-5" /></button>
           <button onClick={() => window.open('https://linkedin.com', '_blank')} className="text-white/20 hover:text-accent transition-colors"><Linkedin className="w-5 h-5" /></button>
-          <button onClick={() => setView("contact")} className="text-white/20 hover:text-accent transition-colors"><Mail className="w-5 h-5" /></button>
+          <Link to="/contact" className="text-white/20 hover:text-accent transition-colors"><Mail className="w-5 h-5" /></Link>
         </div>
       </div>
       
       <div>
         <h4 className="text-[10px] font-bold text-white uppercase tracking-[0.2em] mb-6">Platform</h4>
         <ul className="space-y-4">
-          <li><button onClick={() => setView("landing")} className="text-sm text-white/40 hover:text-accent transition-colors">Generator</button></li>
-          <li><button onClick={() => setView("dashboard")} className="text-sm text-white/40 hover:text-accent transition-colors">Dashboard</button></li>
-          <li><button onClick={() => setView("about")} className="text-sm text-white/40 hover:text-accent transition-colors">How it Works</button></li>
+          <li><Link to="/" className="text-sm text-white/40 hover:text-accent transition-colors">Generator</Link></li>
+          <li><Link to="/dashboard" className="text-sm text-white/40 hover:text-accent transition-colors">Dashboard</Link></li>
+          <li><Link to="/about" className="text-sm text-white/40 hover:text-accent transition-colors">How it Works</Link></li>
+          <li><Link to="/blog" className="text-sm text-white/40 hover:text-accent transition-colors">Blog</Link></li>
+          <li><Link to="/help" className="text-sm text-white/40 hover:text-accent transition-colors">Help Center</Link></li>
         </ul>
       </div>
 
       <div>
         <h4 className="text-[10px] font-bold text-white uppercase tracking-[0.2em] mb-6">Legal & Support</h4>
         <ul className="space-y-4">
-          <li><button onClick={() => setView("privacy")} className="text-sm text-white/40 hover:text-accent transition-colors">Privacy Policy</button></li>
-          <li><button onClick={() => setView("terms")} className="text-sm text-white/40 hover:text-accent transition-colors">Terms of Service</button></li>
-          <li><button onClick={() => setView("contact")} className="text-sm text-white/40 hover:text-accent transition-colors">Contact Support</button></li>
+          <li><Link to="/privacy" className="text-sm text-white/40 hover:text-accent transition-colors">Privacy Policy</Link></li>
+          <li><Link to="/terms" className="text-sm text-white/40 hover:text-accent transition-colors">Terms of Service</Link></li>
+          <li><Link to="/contact" className="text-sm text-white/40 hover:text-accent transition-colors">Contact Support</Link></li>
         </ul>
       </div>
     </div>
@@ -162,65 +170,127 @@ const Footer = ({ setView }: { setView: (v: any) => void }) => (
   </footer>
 );
 
-const Header = ({ user, setView, handleLogout, view }: { user: any, setView: (v: any) => void, handleLogout: () => void, view: string }) => (
-  <nav className="fixed top-0 left-0 right-0 z-[100] px-4 py-4 flex justify-center">
-    <div className="max-w-7xl w-full glass-panel rounded-2xl px-6 py-3 flex items-center justify-between backdrop-blur-3xl border-white/5 border shadow-2xl">
-      <div className="flex items-center space-x-8">
-        <button 
-          onClick={() => setView("landing")}
-          className="flex items-center space-x-2 group"
-        >
-          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5 text-slate-900" />
+const Header = ({ user, handleLogout }: { user: any, handleLogout: () => void }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-[100] px-4 py-4 flex justify-center">
+      <div className="max-w-7xl w-full glass-panel rounded-2xl px-6 py-3 flex items-center justify-between backdrop-blur-3xl border-white/5 border shadow-2xl">
+        <div className="flex items-center space-x-8">
+          <Link 
+            to="/"
+            className="flex items-center space-x-2 group"
+          >
+            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 text-slate-900" />
+            </div>
+            <span className="text-lg font-bold tracking-tighter text-white">LocalSEO AI</span>
+          </Link>
+          
+          <div className="hidden md:flex items-center space-x-6 text-[10px] font-bold uppercase tracking-widest text-white/40">
+            <Link to="/" className={`hover:text-accent transition-colors ${location.pathname === '/' ? 'text-accent' : ''}`}>Tools</Link>
+            <Link to="/dashboard" className={`hover:text-accent transition-colors ${location.pathname === '/dashboard' ? 'text-accent' : ''}`}>Dashboard</Link>
+            <Link to="/help" className={`hover:text-accent transition-colors ${location.pathname === '/help' ? 'text-accent' : ''}`}>Help</Link>
+            <Link to="/blog" className={`hover:text-accent transition-colors ${location.pathname.startsWith('/blog') ? 'text-accent' : ''}`}>Blog</Link>
+            <Link to="/about" className={`hover:text-accent transition-colors ${location.pathname === '/about' ? 'text-accent' : ''}`}>About</Link>
+            <Link to="/contact" className={`hover:text-accent transition-colors ${location.pathname === '/contact' ? 'text-accent' : ''}`}>Contact</Link>
           </div>
-          <span className="text-lg font-bold tracking-tighter text-white">LocalSEO AI</span>
-        </button>
-        
-        <div className="hidden md:flex items-center space-x-6 text-[10px] font-bold uppercase tracking-widest text-white/40">
-          <button onClick={() => setView("landing")} className={`hover:text-accent transition-colors ${view === 'landing' ? 'text-accent' : ''}`}>Tools</button>
-          <button onClick={() => setView("dashboard")} className={`hover:text-accent transition-colors ${view === 'dashboard' ? 'text-accent' : ''}`}>Dashboard</button>
-          <button onClick={() => setView("about")} className={`hover:text-accent transition-colors ${view === 'about' ? 'text-accent' : ''}`}>About</button>
-          <button onClick={() => setView("contact")} className={`hover:text-accent transition-colors ${view === 'contact' ? 'text-accent' : ''}`}>Contact</button>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          {user ? (
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-white/5 rounded-xl px-3 py-1.5 border border-white/10">
+                <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
+                  <UserIcon className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <span className="text-[10px] font-bold text-white/70 max-w-[100px] truncate uppercase tracking-tighter">{user.email}</span>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => navigate("/auth")}
+              className="px-6 py-2 bg-accent text-slate-950 font-bold rounded-xl text-[10px] uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/10 flex items-center space-x-2"
+            >
+              <LogIn className="w-3 h-3" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
+    </nav>
+  );
+};
 
-      <div className="flex items-center space-x-4">
-        {user ? (
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-white/5 rounded-xl px-3 py-1.5 border border-white/10">
-              <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
-                <UserIcon className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <span className="text-[10px] font-bold text-white/70 max-w-[100px] truncate uppercase tracking-tighter">{user.email}</span>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setView("auth")}
-            className="px-6 py-2 bg-accent text-slate-950 font-bold rounded-xl text-[10px] uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/10 flex items-center space-x-2"
-          >
-            <LogIn className="w-3 h-3" />
-            <span>Sign In</span>
-          </button>
-        )}
-      </div>
-    </div>
-  </nav>
-);
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 export default function App() {
-  const [view, setView] = useState<"landing" | "article" | "dashboard" | "edit" | "auth" | "about" | "privacy" | "terms" | "contact">("landing");
+  return (
+    <BrowserRouter>
+      <ScrollToTop />
+      <AppContent />
+    </BrowserRouter>
+  );
+}
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
+
+  // Map URLs to views for legacy compatibility and animation keys
+  const getViewFromPath = (path: string) => {
+    if (path === '/') return 'landing';
+    if (path === '/article') return 'article';
+    if (path === '/dashboard') return 'dashboard';
+    if (path === '/edit') return 'edit';
+    if (path === '/auth') return 'auth';
+    if (path === '/about') return 'about';
+    if (path === '/privacy') return 'privacy';
+    if (path === '/terms') return 'terms';
+    if (path === '/contact') return 'contact';
+    if (path === '/help') return 'help';
+    if (path === '/blog') return 'blog';
+    if (path.startsWith('/blog/')) return 'blog-post';
+    return 'landing';
+  };
+
+  const setView = (v: string) => {
+    switch (v) {
+      case 'landing': navigate('/'); break;
+      case 'article': navigate('/article'); break;
+      case 'dashboard': navigate('/dashboard'); break;
+      case 'edit': navigate('/edit'); break;
+      case 'auth': navigate('/auth'); break;
+      case 'about': navigate('/about'); break;
+      case 'privacy': navigate('/privacy'); break;
+      case 'terms': navigate('/terms'); break;
+      case 'contact': navigate('/contact'); break;
+      case 'help': navigate('/help'); break;
+      case 'blog': navigate('/blog'); break;
+      case 'blog-post': /* blog post navigation handled by Links directly */ break;
+      default: navigate('/');
+    }
+  };
+
+  const view = getViewFromPath(location.pathname);
 
   useEffect(() => {
     console.log("App mounted, view:", view);
@@ -955,18 +1025,19 @@ ${articleData.content}
 
   return (
     <div className="min-h-screen selection:bg-accent/30 bg-[#0f172a] selection:text-white overflow-x-hidden font-sans pt-24">
-      <Header user={user} setView={setView} handleLogout={handleLogout} view={view} />
+      <Header user={user} handleLogout={handleLogout} />
       {/* Background decoration */}
 
-      <AnimatePresence>
-        {view === "landing" ? (
-          <motion.div 
-            key="landing"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="max-w-4xl mx-auto px-4 py-20 relative z-10"
-          >
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={
+            <motion.div 
+              key="landing"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto px-4 py-20 relative z-10"
+            >
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-4 mb-6">
                   <div className="inline-flex items-center px-4 py-2 bg-accent/10 text-accent rounded-full text-xs font-bold uppercase tracking-widest border border-accent/30">
@@ -987,7 +1058,13 @@ ${articleData.content}
                     onClick={() => setView("about")}
                     className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
                   >
-                    About & Benefits
+                    About
+                  </button>
+                  <button 
+                    onClick={() => setView("help")}
+                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
+                  >
+                    Help Guide
                   </button>
                 </div>
                 <h1 className="text-4xl font-bold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
@@ -1120,6 +1197,8 @@ ${articleData.content}
                 </div>
               </div>
 
+              <AdSlot position="content" className="!my-8" />
+
               <button 
                 onClick={isBatchMode ? generateBatch : generateArticle}
                 disabled={loading || (isBatchMode ? !batchTopics : !formData.topic) || !formData.location}
@@ -1201,16 +1280,19 @@ ${articleData.content}
               <div className="flex items-center"><b className="text-white mr-2">842</b> Cities Covered</div>
             </div>
 
-            <Footer setView={setView} />
+            <Footer />
           </motion.div>
-        ) : view === "edit" && user ? (
-          <motion.div 
-            key="edit"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="max-w-6xl mx-auto px-4 py-20 relative z-10"
-          >
+        } />
+
+        <Route path="/edit" element={
+          user ? (
+            <motion.div 
+              key="edit"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-6xl mx-auto px-4 py-20 relative z-10"
+            >
             {/* Breadcrumbs for SEO */}
               <nav className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-white/30 mb-8 overflow-x-auto whitespace-nowrap pb-2">
                 <button onClick={() => setView("landing")} className="hover:text-accent flex items-center hover:bg-white/5 px-2 py-1 rounded transition-all">
@@ -1329,11 +1411,25 @@ ${articleData.content}
               </div>
             </div>
           </motion.div>
-        ) : view === "article" ? (
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <h2 className="text-2xl font-bold mb-4">Please log in to edit articles</h2>
+              <button 
+                onClick={() => navigate("/auth")}
+                className="px-8 py-4 bg-accent text-slate-950 font-bold rounded-2xl"
+              >
+                Go to login
+              </button>
+            </div>
+          )
+        } />
+
+        <Route path="/article" element={
           <motion.div 
             key="article"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="min-h-screen"
           >
             {/* Top Bar */}
@@ -1616,41 +1712,82 @@ ${articleData.content}
               <AdSlot position="bottom" />
             </div>
           </motion.div>
-        ) : view === "privacy" ? (
+        } />
+
+        <Route path="/privacy" element={
           <motion.div 
             key="privacy"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PrivacyPolicy onBack={() => setView("landing")} />
+            <PrivacyPolicy onBack={() => navigate("/")} />
           </motion.div>
-        ) : view === "terms" ? (
+        } />
+
+        <Route path="/terms" element={
           <motion.div 
             key="terms"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <TermsOfService onBack={() => setView("landing")} />
+            <TermsOfService onBack={() => navigate("/")} />
           </motion.div>
-        ) : view === "contact" ? (
+        } />
+
+        <Route path="/contact" element={
           <motion.div 
             key="contact"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Contact onBack={() => setView("landing")} />
+            <Contact onBack={() => navigate("/")} />
           </motion.div>
-        ) : view === "dashboard" && user ? (
+        } />
+
+        <Route path="/help" element={
           <motion.div 
-            key="dashboard"
+            key="help"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="max-w-6xl mx-auto px-4 py-20 relative z-10"
           >
+            <Help onBack={() => navigate("/")} />
+          </motion.div>
+        } />
+        <Route path="/blog" element={
+          <motion.div 
+            key="blog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Blog posts={blogPosts} />
+          </motion.div>
+        } />
+
+        <Route path="/blog/:slug" element={
+          <motion.div 
+            key="blog-post"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <BlogPost />
+          </motion.div>
+        } />
+
+        <Route path="/dashboard" element={
+          user ? (
+            <motion.div 
+              key="dashboard"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-6xl mx-auto px-4 py-20 relative z-10"
+            >
             {/* Dashboard Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
               <div>
@@ -1785,7 +1922,7 @@ ${articleData.content}
                       <button 
                         onClick={() => {
                           setArticleData(article);
-                          setView("article");
+                          navigate("/article");
                         }}
                         className="flex-1 bg-accent text-slate-950 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-accent/90 transition-all shadow-[0_4px_10px_rgba(76,201,240,0.2)]"
                       >
@@ -1809,14 +1946,13 @@ ${articleData.content}
               </div>
             ) : (
               <div className="glass-panel rounded-[32px] p-20 text-center">
-                {/* No articles ... */}
                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
                   <FileText className="w-10 h-10 text-white/20" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">No articles found</h2>
                 <p className="text-white/40 max-w-sm mx-auto mb-8 font-medium">Try adjusting your search or generate your first local SEO article.</p>
                 <button 
-                  onClick={() => setView("landing")}
+                  onClick={() => navigate("/")}
                   className="bg-accent text-slate-950 px-8 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-accent/90 transition-all"
                 >
                   Create New Article
@@ -1824,9 +1960,22 @@ ${articleData.content}
               </div>
             )}
             
-            <Footer setView={setView} />
+            <Footer />
           </motion.div>
-        ) : view === "auth" ? (
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <h2 className="text-2xl font-bold mb-4">Please log in to access your dashboard</h2>
+              <button 
+                onClick={() => navigate("/auth")}
+                className="px-8 py-4 bg-accent text-slate-950 font-bold rounded-2xl"
+              >
+                Go to login
+              </button>
+            </div>
+          )
+        } />
+
+        <Route path="/auth" element={
           <motion.div 
             key="auth"
             initial={{ opacity: 0 }}
@@ -1834,9 +1983,11 @@ ${articleData.content}
             exit={{ opacity: 0 }}
             className="flex items-center justify-center min-h-screen p-4"
           >
-            <Auth onBack={() => setView("landing")} onSuccess={() => setView("landing")} />
+            <Auth onBack={() => navigate("/")} onSuccess={() => navigate("/")} />
           </motion.div>
-        ) : view === "about" ? (
+        } />
+
+        <Route path="/about" element={
           <motion.div 
             key="about"
             initial={{ opacity: 0 }}
@@ -1844,19 +1995,29 @@ ${articleData.content}
             exit={{ opacity: 0 }}
             className="min-h-screen"
           >
-            <About onBack={() => setView("landing")} />
+            <About onBack={() => navigate("/")} />
           </motion.div>
-        ) : (
+        } />
+
+        <Route path="*" element={
           <motion.div 
             key="fallback"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-center justify-center min-h-screen text-white/20 font-mono text-xs"
+            className="flex flex-col items-center justify-center min-h-screen text-white text-center px-4"
           >
-            Initializing Local SEO Suite...
+            <h1 className="text-6xl font-bold mb-4">404</h1>
+            <p className="text-white/40 mb-8">Page not found</p>
+            <button 
+              onClick={() => navigate("/")}
+              className="px-8 py-4 bg-accent text-slate-950 font-bold rounded-2xl"
+            >
+              Back to Home
+            </button>
           </motion.div>
-        )}
-      </AnimatePresence>
+        } />
+      </Routes>
+    </AnimatePresence>
 
       {/* Settings Modal */}
       <AnimatePresence>

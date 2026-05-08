@@ -3,6 +3,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import nodemailer from "nodemailer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +50,75 @@ async function startServer() {
     if (!query) return res.json([]);
     const matches = CITIES.filter(city => city.toLowerCase().includes(query)).slice(0, 10);
     res.json(matches);
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    const { name, email, message } = req.body;
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    try {
+      let recipient = "gomgomtechnologies@gmail.com";
+      let envRecip = process.env.CONTACT_RECIPIENT;
+      
+      if (envRecip) {
+        // Strip literal quotes and common placeholder strings
+        envRecip = envRecip.replace(/^["']|["']$/g, '').trim();
+        if (envRecip && envRecip !== 'undefined' && envRecip !== 'null' && envRecip.includes('@')) {
+          recipient = envRecip;
+        }
+      }
+
+      console.log(`[Contact Form] Raw Recipient Env: ${process.env.CONTACT_RECIPIENT}`);
+      console.log(`[Contact Form] Resolved Recipient: ${recipient}`);
+
+      const transportConfig: any = {
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: process.env.SMTP_PORT === "465",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      };
+
+      const transporter = nodemailer.createTransport(transportConfig);
+
+      const mailOptions = {
+        from: process.env.SMTP_USER || "gomgomtechnologies@gmail.com",
+        replyTo: email,
+        to: recipient,
+        subject: `New Contact Submission: ${name}`,
+        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 12px;">
+            <h2 style="color: #0f172a; margin-bottom: 20px;">New Contact Form Submission</h2>
+            <p><strong>Name:</strong> ${name}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p><strong>Message:</strong></p>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; color: #334155;">
+              ${message.replace(/\n/g, '<br>')}
+            </div>
+          </div>
+        `,
+      };
+
+      console.log(`[Contact Form] mailOptions.to value: "${mailOptions.to}" type: ${typeof mailOptions.to}`);
+
+      if (!mailOptions.to || mailOptions.to === 'undefined' || !mailOptions.to.includes('@')) {
+        throw new Error(`Invalid recipient address: "${mailOptions.to}"`);
+      }
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[Contact Form] Email sent successfully: ${info.messageId}`);
+      res.status(200).json({ success: true, message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email", details: error.message });
+    }
   });
 
   // Vite middleware for development
