@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -25,4 +26,33 @@
 .glass-panel {
   @apply bg-glass-bg backdrop-blur-[24px] border border-glass-border;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Professional Blog Content Formatting */
+.prose blockquote {
+  @apply border-l-4 border-accent bg-accent/5 p-6 rounded-r-2xl italic text-white/90;
+}
+
+.prose h2 {
+  @apply text-3xl font-bold mt-16 mb-8 text-white tracking-tight border-b border-white/5 pb-4;
+}
+
+.prose h3 {
+  @apply text-xl font-bold mt-12 mb-6 text-white/90;
+}
+
+.prose p {
+  @apply leading-relaxed mb-8 text-white/70;
+}
+
+.prose ul, .prose ol {
+  @apply mb-8 space-y-3;
+}
+
+.prose li {
+  @apply text-white/70;
+}
+
+.prose strong {
+  @apply text-white font-semibold;
 }

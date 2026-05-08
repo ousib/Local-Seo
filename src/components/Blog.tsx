@@ -36,13 +36,13 @@ export const Blog: React.FC<BlogProps> = ({ posts }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="h-full"
+              className={`h-full ${idx === 0 ? 'md:col-span-2' : ''}`}
             >
               <Link
                 to={`/blog/${post.slug}`}
-                className="glass-panel group cursor-pointer hover:border-accent/30 transition-all flex flex-col h-full overflow-hidden"
+                className={`glass-panel group cursor-pointer hover:border-accent/30 transition-all flex h-full overflow-hidden ${idx === 0 ? 'flex-col md:flex-row' : 'flex-col'}`}
               >
-              <div className="aspect-video relative overflow-hidden">
+              <div className={`${idx === 0 ? 'md:w-1/2 aspect-video md:aspect-auto' : 'aspect-video'} relative overflow-hidden`}>
                 <img 
                   src={post.image} 
                   alt={post.title}
@@ -52,23 +52,23 @@ export const Blog: React.FC<BlogProps> = ({ posts }) => {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
                 <div className="absolute bottom-4 left-4 flex items-center space-x-2">
                   <span className="bg-accent text-slate-950 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">
-                    {post.tags[0]}
+                    {idx === 0 ? 'Featured Post' : post.tags[0]}
                   </span>
                 </div>
               </div>
               
-              <div className="p-6 flex flex-col flex-grow">
-                <div className="flex items-center space-x-4 text-[10px] text-white/30 uppercase tracking-widest mb-3">
+              <div className={`p-8 flex flex-col flex-grow ${idx === 0 ? 'md:w-1/2' : ''}`}>
+                <div className="flex items-center space-x-4 text-[10px] text-white/30 uppercase tracking-widest mb-4">
                   <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {post.date}</span>
-                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> 8 min read</span>
+                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {idx === 0 ? '15' : '10'} min read</span>
                 </div>
-                <h3 className="text-xl font-bold mb-3 group-hover:text-accent transition-colors">
+                <h3 className={`${idx === 0 ? 'text-2xl md:text-3xl' : 'text-xl'} font-bold mb-4 group-hover:text-accent transition-colors leading-tight`}>
                   {post.title}
                 </h3>
-                <p className="text-white/50 text-sm leading-relaxed mb-6 line-clamp-3">
+                <p className="text-white/50 text-sm leading-relaxed mb-8 line-clamp-4">
                   {post.excerpt}
                 </p>
-                <div className="mt-auto flex items-center text-accent text-[10px] font-bold uppercase tracking-widest pt-4 border-t border-white/5">
+                <div className="mt-auto flex items-center text-accent text-[10px] font-bold uppercase tracking-widest pt-6 border-t border-white/5">
                   Read Full Article <ArrowLeft className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform rotate-180" />
                 </div>
               </div>

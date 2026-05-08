@@ -10,6 +10,19 @@ export const BlogPostComponent: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const post = blogPosts.find(p => p.slug === slug);
 
+  const [readingProgress, setReadingProgress] = React.useState(0);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / totalHeight) * 100;
+      setReadingProgress(progress);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   if (!post) {
     return (
       <div className="min-h-screen pt-32 flex flex-col items-center justify-center text-center px-4">
@@ -23,8 +36,15 @@ export const BlogPostComponent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24">
-      {/* ProgressBar or Top Navigation could go here */}
+    <div className="min-h-screen pt-24 bg-[#0b0e14]">
+      {/* Reading Progress Bar */}
+      <div className="fixed top-24 left-0 w-full h-1 z-[60] pointer-events-none">
+        <motion.div 
+          className="h-full bg-accent shadow-[0_0_10px_rgba(76,201,240,0.5)]"
+          style={{ width: `${readingProgress}%` }}
+        />
+      </div>
+
       <div className="sticky top-0 z-50 bg-[#0f172a]/80 backdrop-blur-md border-b border-white/5 py-4 px-8 mt-8">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link 
@@ -79,7 +99,7 @@ export const BlogPostComponent: React.FC = () => {
             />
           </div>
 
-          <div className="prose prose-invert prose-lg max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-accent prose-strong:text-white prose-p:text-white/70 prose-li:text-white/70">
+          <div className="prose prose-invert prose-lg max-w-none pt-8 border-t border-white/5">
             <ReactMarkdown>{post.content}</ReactMarkdown>
           </div>
 
