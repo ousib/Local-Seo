@@ -653,7 +653,7 @@ function AppContent() {
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
 
-    if (!isPremium && savedArticles.length >= 3) {
+    if (!isPremium && savedArticles.length >= 10) {
       alert("You've reached the free limit of 3 articles. Please upgrade to Pro to generate more content.");
       setView("dashboard");
       return;
