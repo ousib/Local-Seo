@@ -422,7 +422,7 @@ function AppContent() {
       - Generate FAQ Schema Markup in JSON-LD format.
     `;
 
-    const result = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
@@ -446,7 +446,7 @@ function AppContent() {
       }
     });
 
-    const data = JSON.parse(result.response.text());
+    const data = JSON.parse(response.text || "{}");
     data.locationAddress = exactAddress || location;
     return data;
   };
@@ -698,7 +698,7 @@ function AppContent() {
     if (!formData.location || !formData.topic) return;
 
     if (!isPremium && savedArticles.length >= 10) {
-      alert("You've reached the free limit of 3 articles. Please upgrade to Pro to generate more content.");
+      alert("You've reached the free limit of 10 articles. Please upgrade to Pro to generate more content.");
       setView("dashboard");
       return;
     }
@@ -730,8 +730,8 @@ function AppContent() {
       return;
     }
 
-    if (!isPremium && topics.length > 3) {
-      alert("Free accounts are limited to 3 articles per batch. Please upgrade to Pro for unlimited bulk generation.");
+    if (!isPremium && topics.length > 10) {
+      alert("Free accounts are limited to 10 articles per batch. Please upgrade to Pro for unlimited bulk generation.");
       return;
     }
 
@@ -929,12 +929,12 @@ ${articleData.content}
         Original Section:
         "${sectionText}"
       `;
-      const result = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt
       });
       
-      const newText = result.response.text() || sectionText;
+      const newText = response.text || sectionText;
       if (editingArticle) {
         setEditingArticle({
           ...editingArticle,
@@ -1791,7 +1791,7 @@ ${articleData.content}
                       Upgrade to Pro
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-2">Unlock Unlimited Article Generation</h3>
-                    <p className="text-white/60">Free accounts are limited to 3 articles. Get unlimited generation and priority support.</p>
+                    <p className="text-white/60">Free accounts are limited to 10 articles. Get unlimited generation and priority support.</p>
                   </div>
                   <button 
                     onClick={handleUpgrade}
