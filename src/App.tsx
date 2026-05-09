@@ -408,20 +408,21 @@ function AppContent() {
       ${exactAddress ? `- Specific Address: ${exactAddress}` : ''}
 
       Strict Content Quality Requirements:
-      - H1 tag MUST include the target keyword + location.
-      - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
+      - USE MARKDOWN FORMAT ONLY. DO NOT USE HTML TAGS.
+      - Start with a Markdown H1 header (# Title) that includes the target keyword + location.
+      - Include 5-7 informative Markdown subheaders (## H2, ### H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
       - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
       - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
       - **Seasonal Relevance**: Include advice specific to the current climate or season in ${location} (e.g., "Preparing for high summer humidity in ${location}...", "Winterizing pipes for Texas freezes...").
       - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
       - Naturally integrate LSI keywords (related industry terms).
-      - Frequently Asked Questions section.
+      - Frequently Asked Questions section using Markdown.
       - Strong Call to Action.
       - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
       - Generate FAQ Schema Markup in JSON-LD format.
     `;
 
-    const response = await ai.models.generateContent({
+    const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
@@ -445,7 +446,7 @@ function AppContent() {
       }
     });
 
-    const data = JSON.parse(response.text);
+    const data = JSON.parse(result.response.text());
     data.locationAddress = exactAddress || location;
     return data;
   };
@@ -922,17 +923,18 @@ ${articleData.content}
       const prompt = `
         Rewrite the following section of an article for better SEO and engagement.
         Maintain the original meaning but make it more professional and local-SEO focused.
-        Return ONLY the rewritten markdown text.
+        Return ONLY the rewritten MARKDOWN text. STRICTLY FORBIDDEN FROM RUNNING OR RETURNING ANY HTML TAGS.
+        Use Markdown formatting (e.g., **bold**, *italics*, # headers) only.
 
         Original Section:
         "${sectionText}"
       `;
-      const response = await ai.models.generateContent({
+      const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt
       });
       
-      const newText = response.text || sectionText;
+      const newText = result.response.text() || sectionText;
       if (editingArticle) {
         setEditingArticle({
           ...editingArticle,
@@ -1572,34 +1574,37 @@ ${articleData.content}
                       </h2>
                     </div>
                     
-                    <div className="max-w-none font-sans text-white/70">
+                    <div className="max-w-none font-sans text-white/80 article-content">
                       <Markdown components={{
-                        h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-4 uppercase tracking-wider leading-tight border-b border-glass-border pb-3" {...props} />,
+                        h1: ({node, ...props}) => <h1 className="text-3xl font-bold text-white mb-8 uppercase tracking-tight leading-tight border-b border-glass-border pb-4" {...props} />,
                         h2: ({node, ...props}) => (
                           <>
-                            <h2 className="text-base font-semibold text-white/90 mt-6 mb-2 flex items-center" {...props} />
-                            {/* Potential In-p-content Ad Slot (simplified check for second H2) */}
+                            <h2 className="text-xl font-bold text-white/90 mt-12 mb-6 flex items-center group" {...props}>
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent mr-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              {props.children}
+                            </h2>
+                            {/* Potential In-p-content Ad Slot (simplified check for specific H2) */}
                             {props.children?.toString().includes('Key Considerations') && <AdSlot position="content" />}
                           </>
                         ),
-                        h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white/80 mt-4 mb-2" {...props} />,
-                        p: ({node, ...props}) => <p className="text-[15px] text-white/70 leading-relaxed mb-6 font-normal max-w-prose" {...props} />,
-                        ul: ({node, ...props}) => <ul className="list-disc list-outside pl-5 mb-6 space-y-2 text-white/70 text-[15px] max-w-prose" {...props} />,
-                        ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-5 mb-6 space-y-2 text-white/70 text-[15px] max-w-prose" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-bold text-white/80 mt-8 mb-4 border-l-2 border-accent/30 pl-4" {...props} />,
+                        p: ({node, ...props}) => <p className="text-[16px] text-white/70 leading-relaxed mb-6 font-normal max-w-prose" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-disc list-outside pl-6 mb-8 space-y-3 text-white/70 text-[16px] max-w-prose" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-6 mb-8 space-y-3 text-white/70 text-[16px] max-w-prose" {...props} />,
                         li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
-                        strong: ({node, ...props}) => <strong className="font-semibold text-white/70" {...props} />,
-                        em: ({node, ...props}) => <em className="italic text-white/40" {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote className="border-l border-accent/20 bg-white/5 p-4 my-4 rounded-xl italic text-white/50 text-xs" {...props} />,
-                        code: ({node, ...props}) => <code className="bg-black/40 text-accent/70 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props} />,
-                        hr: ({node, ...props}) => <hr className="my-8 border-glass-border" {...props} />,
+                        strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                        em: ({node, ...props}) => <em className="italic text-white/60 underline decoration-accent/20 decoration-2 underline-offset-4" {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-accent bg-white/5 p-6 my-8 rounded-2xl italic text-white/60 text-sm leading-loose shadow-xl" {...props} />,
+                        code: ({node, ...props}) => <code className="bg-white/10 text-accent font-medium px-2 py-0.5 rounded text-[12px] font-mono border border-white/5" {...props} />,
+                        hr: ({node, ...props}) => <hr className="my-12 border-glass-border border-dashed" {...props} />,
                         table: ({node, ...props}) => (
-                          <div className="overflow-x-auto my-6 rounded-xl border border-glass-border">
-                            <table className="w-full text-left text-xs" {...props} />
+                          <div className="overflow-x-auto my-10 rounded-2xl border border-glass-border shadow-2xl bg-white/2">
+                            <table className="w-full text-left text-sm" {...props} />
                           </div>
                         ),
-                        thead: ({node, ...props}) => <thead className="bg-white/3 text-white/70 font-semibold" {...props} />,
-                        th: ({node, ...props}) => <th className="px-4 py-2 border-b border-glass-border" {...props} />,
-                        td: ({node, ...props}) => <td className="px-4 py-2 border-b border-glass-border text-white/40" {...props} />,
+                        thead: ({node, ...props}) => <thead className="bg-white/5 text-white/90 font-bold" {...props} />,
+                        th: ({node, ...props}) => <th className="px-6 py-4 border-b border-glass-border" {...props} />,
+                        td: ({node, ...props}) => <td className="px-6 py-4 border-b border-glass-border text-white/60" {...props} />,
                       }}>{articleData?.content}</Markdown>
                     </div>
 
