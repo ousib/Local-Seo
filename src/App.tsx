@@ -81,17 +81,6 @@ interface ArticleRequest {
   topic: string;
 }
 
-// Initialize Gemini lazily to avoid crashes if API key is missing during module load
-const getAiClient = () => {
-  // Use Vite's import.meta.env as primary, with a safe fallback
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
-  
-  if (!apiKey || apiKey === "undefined" || apiKey === "") {
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
 const INDUSTRIES = [
   "Plumber", "Roofer", "Dentist", "Electrician", "HVAC", 
   "Real Estate", "Lawyer", "Restaurant", "Personal Trainer", "Car Mechanic"
@@ -407,6 +396,60 @@ function AppContent() {
   const [batchProgress, setBatchProgress] = useState<{ topic: string; status: 'waiting' | 'generating' | 'completed' | 'failed' }[]>([]);
   const [isBatchRunning, setIsBatchRunning] = useState(false);
 
+  const runSingleGeneration = async (topic: string, location: string, industry: string, exactAddress?: string) => {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `
+      Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
+      
+      Business Context:
+      - Industry: ${industry}
+      - Location: ${location}
+      - Target Topic: ${topic}
+      ${exactAddress ? `- Specific Address: ${exactAddress}` : ''}
+
+      Strict Content Quality Requirements:
+      - H1 tag MUST include the target keyword + location.
+      - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
+      - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
+      - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
+      - **Seasonal Relevance**: Include advice specific to the current climate or season in ${location} (e.g., "Preparing for high summer humidity in ${location}...", "Winterizing pipes for Texas freezes...").
+      - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
+      - Naturally integrate LSI keywords (related industry terms).
+      - Frequently Asked Questions section.
+      - Strong Call to Action.
+      - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
+      - Generate FAQ Schema Markup in JSON-LD format.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            metaTitle: { type: Type.STRING },
+            metaDescription: { type: Type.STRING },
+            suggestedSlug: { type: Type.STRING },
+            content: { type: Type.STRING },
+            internalLinks: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING }
+            },
+            schemaMarkup: { type: Type.STRING }
+          },
+          required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text);
+    data.locationAddress = exactAddress || location;
+    return data;
+  };
+
   useEffect(() => {
     if (!loading) return;
     let i = 0;
@@ -659,12 +702,6 @@ function AppContent() {
       return;
     }
 
-    const ai = getAiClient();
-    if (!ai) {
-      alert("GEMINI_API_KEY is not configured. Please add it to your environment variables.");
-      return;
-    }
-
     setLoading(true);
     setProgress(0);
     const progressInterval = setInterval(() => {
@@ -694,12 +731,6 @@ function AppContent() {
 
     if (!isPremium && topics.length > 3) {
       alert("Free accounts are limited to 3 articles per batch. Please upgrade to Pro for unlimited bulk generation.");
-      return;
-    }
-
-    const ai = getAiClient();
-    if (!ai) {
-      alert("GEMINI_API_KEY is not configured.");
       return;
     }
 
@@ -755,60 +786,6 @@ function AppContent() {
     setIsBatchRunning(false);
     alert(`Batch complete! Generated ${completedCount} articles successfully.`);
     setView("dashboard");
-  };
-
-  const runSingleGeneration = async (topic: string, location: string, industry: string, exactAddress?: string) => {
-    const ai = getAiClient()!;
-    const prompt = `
-      Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
-      
-      Business Context:
-      - Industry: ${industry}
-      - Location: ${location}
-      - Target Topic: ${topic}
-
-      Strict Content Quality Requirements:
-      - H1 tag MUST include the target keyword + location.
-      - 5-7 informative subheadings (H2, H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
-      - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
-      - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
-      - **Seasonal Relevance**: Include advice specific to the current climate or season in ${location} (e.g., "Preparing for high summer humidity in ${location}...", "Winterizing pipes for Texas freezes...").
-      - **Actionable Advice**: Provide concrete, actionable steps for the reader that are specific to the service and location.
-      - Naturally integrate LSI keywords (related industry terms).
-      - Frequently Asked Questions section.
-      - Strong Call to Action.
-      - Generate internal linking suggestions (3-5 relevant anchor text/topic ideas).
-      - Generate FAQ Schema Markup in JSON-LD format.
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING, description: "H1 Title of the article (Keyword + Location)" },
-            metaTitle: { type: Type.STRING, description: "SEO Title tag (under 60 chars)" },
-            metaDescription: { type: Type.STRING, description: "Meta description (150-160 chars)" },
-            suggestedSlug: { type: Type.STRING, description: "URL-friendly slug" },
-            content: { type: Type.STRING, description: "The full 1,500-word article in Markdown format" },
-            internalLinks: { 
-              type: Type.ARRAY, 
-              items: { type: Type.STRING },
-              description: "3-5 Internal linking suggestions" 
-            },
-            schemaMarkup: { type: Type.STRING, description: "FAQ JSON-LD schema markup" },
-          },
-          required: ["title", "metaTitle", "metaDescription", "suggestedSlug", "content", "internalLinks", "schemaMarkup"]
-        }
-      }
-    });
-
-    const data = JSON.parse(response.text);
-    data.locationAddress = exactAddress || location;
-    return data;
   };
 
   const handleCopy = () => {
@@ -938,15 +915,10 @@ ${articleData.content}
   const rewriteSection = async (sectionText: string) => {
     if (!sectionText) return;
     
-    const ai = getAiClient();
-    if (!ai) {
-      alert("GEMINI_API_KEY is not configured.");
-      return;
-    }
-
     setLoading(true);
     setLoadingMessage("AI is rewriting section...");
     try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const prompt = `
         Rewrite the following section of an article for better SEO and engagement.
         Maintain the original meaning but make it more professional and local-SEO focused.
