@@ -24,12 +24,12 @@ export const TermsOfService: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
             <section>
               <h2 className="text-xl font-bold text-white mb-3">1. Acceptance of Terms</h2>
-              <p>By accessing or using Local SEO Suite, you agree to be bound by these Terms of Service. If you do not agree to all of these terms, do not use our services.</p>
+              <p>By accessing or using Local Seo Machine, you agree to be bound by these Terms of Service. If you do not agree to all of these terms, do not use our services.</p>
             </section>
 
             <section>
               <h2 className="text-xl font-bold text-white mb-3">2. Service Description</h2>
-              <p>Local SEO Suite provides AI-powered content generation tools designed to assist in local search engine optimization. We provide these tools "as is" and do not guarantee specific ranking results or traffic increases.</p>
+              <p>Local Seo Machine provides AI-powered content generation tools designed to assist in local search engine optimization. We provide these tools "as is" and do not guarantee specific ranking results or traffic increases.</p>
             </section>
 
             <section>
@@ -44,7 +44,7 @@ export const TermsOfService: React.FC<{ onBack: () => void }> = ({ onBack }) => 
 
             <section>
               <h2 className="text-xl font-bold text-white mb-3">5. Limitation of Liability</h2>
-              <p>In no event shall Local SEO Suite or its creators be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of the platform.</p>
+              <p>In no event shall Local Seo Machine or its creators be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of the platform.</p>
             </section>
           </div>
         </div>

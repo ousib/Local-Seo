@@ -60,7 +60,7 @@ export default function About({ onBack }: AboutProps) {
       >
         <div className="inline-flex items-center px-4 py-2 bg-accent/10 text-accent rounded-full text-xs font-bold uppercase tracking-widest border border-accent/30 mb-6">
           <Sparkles className="w-4 h-4 mr-2" />
-          The Future of Local SEO
+          The Future of Local Seo Machine
         </div>
         <h1 className="text-4xl font-bold tracking-tight mb-8 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
           Empowering Local Businesses with <br />

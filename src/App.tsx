@@ -116,7 +116,7 @@ const Footer = () => (
           <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
             <Sparkles className="w-6 h-6 text-slate-900" />
           </div>
-          <span className="text-xl font-bold tracking-tighter text-white">LocalSEO AI</span>
+          <span className="text-xl font-bold tracking-tighter text-white">Local Seo Machine</span>
         </div>
         <p className="text-white/40 text-sm leading-relaxed max-w-sm mb-8">
           The world's most advanced AI content engine for local business growth. We help small businesses dominate search results through data-driven content generation.
@@ -150,7 +150,7 @@ const Footer = () => (
     </div>
     
     <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] items-center font-bold text-white/20 uppercase tracking-[0.2em]">
-      <div>&copy; 2026 LocalSEO AI Suite. All rights reserved.</div>
+      <div>&copy; 2026 Local Seo Machine. All rights reserved.</div>
       <div className="flex items-center space-x-8">
         <span>AdSense Ready Platform</span>
         <span>Google AI Partners</span>
@@ -174,7 +174,7 @@ const Header = ({ user, handleLogout }: { user: any, handleLogout: () => void })
             <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
               <Sparkles className="w-5 h-5 text-slate-900" />
             </div>
-            <span className="text-lg font-bold tracking-tighter text-white">LocalSEO AI</span>
+            <span className="text-lg font-bold tracking-tighter text-white">Local Seo Machine</span>
           </Link>
           
           <div className="hidden md:flex items-center space-x-6 text-[10px] font-bold uppercase tracking-widest text-white/40">
@@ -399,7 +399,13 @@ function AppContent() {
   const runSingleGeneration = async (topic: string, location: string, industry: string, exactAddress?: string) => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = `
-      Write a high-quality, 1,500-word SEO-optimized local business article. This article must NOT be generic; it must feel like it was written by a local expert.
+      You are the elite AI engine of "Local Seo Machine". Your goal is to write a high-quality, 1,500-word SEO-optimized local business article. 
+      This article must NOT be generic; it must feel like it was written by a local expert who knows the area like the back of their hand.
+      
+      CRITICAL FORMATTING RULE: 
+      - USE MARKDOWN FORMAT ONLY. 
+      - ABSOLUTELY NO HTML TAGS. NO <p>, NO <br>, NO <div>, NO <span>.
+      - Use standard Markdown characters for styling (# for headers, ** for bold, etc.).
       
       Business Context:
       - Industry: ${industry}
@@ -407,8 +413,7 @@ function AppContent() {
       - Target Topic: ${topic}
       ${exactAddress ? `- Specific Address: ${exactAddress}` : ''}
 
-      Strict Content Quality Requirements:
-      - USE MARKDOWN FORMAT ONLY. DO NOT USE HTML TAGS.
+      Content Quality Requirements:
       - Start with a Markdown H1 header (# Title) that includes the target keyword + location.
       - Include 5-7 informative Markdown subheaders (## H2, ### H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
       - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
@@ -1016,7 +1021,7 @@ ${articleData.content}
                 <div className="inline-flex items-center space-x-4 mb-6">
                   <div className="inline-flex items-center px-4 py-2 bg-accent/10 text-accent rounded-full text-xs font-bold uppercase tracking-widest border border-accent/30">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    AI-Powered Local SEO
+                    Local Seo Machine AI
                   </div>
                   <button 
                     onClick={() => {
@@ -1042,7 +1047,7 @@ ${articleData.content}
                   </button>
                 </div>
                 <h1 className="text-4xl font-bold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent leading-tight">
-                Generate Local SEO Content <br />
+                Local Seo Machine <br />
                 <span className="text-accent underline decoration-accent/30 decoration-offset-8">in Minutes</span>
               </h1>
               <p className="text-lg text-white/60 max-w-2xl mx-auto font-medium">

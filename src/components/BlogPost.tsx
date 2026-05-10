@@ -106,7 +106,7 @@ export const BlogPostComponent: React.FC = () => {
           <div className="mt-20 p-10 glass-panel rounded-[40px] text-center border-accent/20 border">
             <h3 className="text-2xl font-bold mb-4 text-white">Dominate Your Local Market</h3>
             <p className="text-white/50 mb-8 max-w-lg mx-auto">
-              Want to improve your local rankings faster? Try our Local SEO platform today and start appearing in front of customers.
+              Want to improve your local rankings faster? Try Local Seo Machine today and start appearing in front of customers.
             </p>
             <Link 
               to="/"
@@ -126,7 +126,7 @@ export const BlogPostComponent: React.FC = () => {
             <button className="text-white/40 hover:text-white transition-colors cursor-pointer"><Linkedin className="w-5 h-5" /></button>
           </div>
           <p className="text-white/20 text-xs uppercase tracking-widest font-bold">
-            © 2026 LocalSEO AI. All rights reserved.
+            © 2026 Local Seo Machine. All rights reserved.
           </p>
         </div>
       </footer>

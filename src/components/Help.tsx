@@ -59,7 +59,7 @@ export const Help: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <span>Platform Guide</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-            How to Use LocalSEO AI
+            How to Use Local Seo Machine
           </h1>
           <p className="text-white/40 text-lg max-w-2xl mx-auto leading-relaxed">
             Master local search engine optimization in five simple steps. Our platform handles the technical heavy lifting so you can focus on your business.

@@ -22,7 +22,7 @@ export const Blog: React.FC<BlogProps> = ({ posts }) => {
 
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-            Local SEO Insights
+            Local Seo Machine Insights
           </h1>
           <p className="text-white/40 text-lg max-w-2xl mx-auto leading-relaxed">
             Expert guides, strategies, and industry news to help your small business dominate local search results.
