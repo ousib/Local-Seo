@@ -1,6 +1,5 @@
 
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
@@ -15,8 +14,10 @@ app.use(express.json());
 
 // API Routes
 app.get("/api/health", (req, res) => {
+  console.log("[API] Health check reached");
   res.json({ 
     status: "ok",
+    environment: process.env.VERCEL ? "vercel" : "standard",
     paddleConfigured: !!process.env.PADDLE_API_KEY,
     webhookSecretSet: !!process.env.PADDLE_WEBHOOK_SECRET
   });
@@ -133,17 +134,22 @@ async function startServer() {
   const PORT = 3000;
   
   if (process.env.NODE_ENV !== "production") {
+    // Dynamic import for Vite to avoid loading it in production/Vercel environments
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    // In production (non-Vercel), serve static files from dist
+    if (!process.env.VERCEL) {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   }
 
   if (!process.env.VERCEL) {
@@ -153,4 +159,10 @@ async function startServer() {
   }
 }
 
-startServer().catch(console.error);
+// Only start the server loop if not on Vercel
+// Vercel only needs the exported 'app'
+if (!process.env.VERCEL) {
+  startServer().catch(console.error);
+} else {
+  console.log("[Server] Running in Vercel environment, skipping startServer boot");
+}
