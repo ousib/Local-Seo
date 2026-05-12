@@ -53,13 +53,23 @@ async function startServer() {
   });
 
   app.post("/api/contact", async (req, res) => {
+    console.log("[Contact Form] Received request:", JSON.stringify(req.body));
     const { name, email, message } = req.body;
 
     if (!name || !email || !message) {
+      console.log("[Contact Form] Missing fields:", { name: !!name, email: !!email, message: !!message });
       return res.status(400).json({ error: "All fields are required" });
     }
 
     try {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error("[Contact Form] Error: SMTP_USER or SMTP_PASS environment variables are not set.");
+        return res.status(500).json({ 
+          error: "Server configuration error", 
+          details: "Contact form is not properly configured. Please set SMTP_USER and SMTP_PASS environment variables." 
+        });
+      }
+
       let recipient = "gomgomtechnologies@gmail.com";
       let envRecip = process.env.CONTACT_RECIPIENT;
       

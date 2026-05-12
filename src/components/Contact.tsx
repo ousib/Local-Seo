@@ -19,15 +19,24 @@ export const Contact: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         body: JSON.stringify(formData),
       });
 
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`Server returned non-JSON response (${response.status}). Please check server logs.`);
+      }
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || 'Failed to send message');
+        throw new Error(data.details || data.error || `Failed to send message (${response.status})`);
       }
 
       setStatus('success');
       setFormData({ name: '', email: '', message: '' });
     } catch (err: any) {
-      console.error(err);
+      console.error('Contact Form Error:', err);
       setStatus('error');
       setErrorMessage(err.message || 'Something went wrong. Please try again later.');
     }

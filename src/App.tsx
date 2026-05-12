@@ -395,6 +395,22 @@ function AppContent() {
   const [batchTopics, setBatchTopics] = useState("");
   const [batchProgress, setBatchProgress] = useState<{ topic: string; status: 'waiting' | 'generating' | 'completed' | 'failed' }[]>([]);
   const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [guestGenerationCount, setGuestGenerationCount] = useState(0);
+
+  useEffect(() => {
+    const count = localStorage.getItem("guest_generation_count");
+    if (count) {
+      setGuestGenerationCount(parseInt(count));
+    }
+  }, []);
+
+  const incrementGuestCount = (amount: number = 1) => {
+    if (!user) {
+      const newCount = guestGenerationCount + amount;
+      setGuestGenerationCount(newCount);
+      localStorage.setItem("guest_generation_count", newCount.toString());
+    }
+  };
 
   const runSingleGeneration = async (topic: string, location: string, industry: string, exactAddress?: string) => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -702,6 +718,12 @@ function AppContent() {
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
 
+    if (!user && guestGenerationCount >= 5) {
+      alert("You've reached the free generation limit for guests (5 articles). Please sign up to continue generating professional content!");
+      setView("auth");
+      return;
+    }
+
     if (!isPremium && savedArticles.length >= 10) {
       alert("You've reached the free limit of 10 articles. Please upgrade to Pro to generate more content.");
       setView("dashboard");
@@ -717,6 +739,7 @@ function AppContent() {
     try {
       const data = await runSingleGeneration(formData.topic, formData.location, formData.industry, formData.exactAddress);
       setArticleData(data);
+      incrementGuestCount(1);
       clearInterval(progressInterval);
       setProgress(100);
       setLoading(false);
@@ -733,6 +756,20 @@ function AppContent() {
     if (topics.length === 0 || !formData.location) {
       alert("Please provide at least one topic and a location.");
       return;
+    }
+
+    if (!user) {
+      if (guestGenerationCount >= 5) {
+        alert("You've reached the free generation limit for guests (5 articles). Please sign up to continue generating professional content!");
+        setView("auth");
+        return;
+      }
+      
+      const availableCount = 5 - guestGenerationCount;
+      if (topics.length > availableCount) {
+        alert(`You only have ${availableCount} free generations left. Please reduce your batch size or sign up for unlimited access!`);
+        return;
+      }
     }
 
     if (!isPremium && topics.length > 10) {
@@ -781,6 +818,7 @@ function AppContent() {
 
         setBatchProgress(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'completed' } : item));
         completedCount++;
+        incrementGuestCount(1);
       } catch (err) {
         console.error(`Batch item ${i} failed:`, err);
         setBatchProgress(prev => prev.map((item, idx) => idx === i ? { ...item, status: 'failed' } : item));
@@ -1195,6 +1233,14 @@ ${articleData.content}
                   </>
                 )}
               </button>
+
+              {!user && !loading && (
+                <div className="mt-6 flex items-center justify-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+                  <ShieldAlert className="w-3.5 h-3.5 text-accent" />
+                  <span>Guest Account: {Math.max(0, 5 - guestGenerationCount)} free generations remaining</span>
+                  <button onClick={() => setView("auth")} className="text-accent hover:underline ml-1">Sign Up to Unlock More</button>
+                </div>
+              )}
 
               {/* Progress UI */}
               {loading && !isBatchRunning && (
