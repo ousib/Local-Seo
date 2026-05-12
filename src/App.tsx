@@ -431,7 +431,9 @@ function AppContent() {
 
       Content Quality Requirements:
       - Start with a Markdown H1 header (# Title) that includes the target keyword + location.
+      - IMPORTANT: Ensure there are TWO newlines after the H1 header before any other text.
       - Include 5-7 informative Markdown subheaders (## H2, ### H3). H2s MUST include local variations (e.g., mention ${location} neighborhoods or specific local conditions).
+      - Ensure there are TWO newlines after EVERY header.
       - **Local Regulations**: Reference specific local or state regulations relevant to the industry (e.g., "California Title 24", "Local building codes in ${location}", etc.).
       - **Local Landmarks & Geography**: Mention specific local landmarks, famous streets, parks, or geographic features in ${location} (e.g., "Homes near the Riverwalk...", "Properties on Main St...").
       - **Seasonal Relevance**: Include advice specific to the current climate or season in ${location} (e.g., "Preparing for high summer humidity in ${location}...", "Winterizing pipes for Texas freezes...").
@@ -1419,7 +1421,7 @@ ${articleData.content}
                   <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest block mb-6">Live Preview</label>
                   <div className="max-w-none font-sans text-white/70">
                     <Markdown components={{
-                    h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-4 uppercase tracking-wider leading-tight border-b border-glass-border pb-3" {...props} />,
+                    h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-4 tracking-wider leading-tight border-b border-glass-border pb-3" {...props} />,
                     h2: ({node, ...props}) => <h2 className="text-base font-semibold text-white/90 mt-6 mb-2 flex items-center" {...props} />,
                     h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white/80 mt-4 mb-2" {...props} />,
                     p: ({node, ...props}) => <p className="text-sm text-white/60 leading-relaxed mb-4 font-normal" {...props} />,
@@ -1627,7 +1629,7 @@ ${articleData.content}
                     
                     <div className="max-w-none font-sans text-white/80 article-content">
                       <Markdown components={{
-                        h1: ({node, ...props}) => <h1 className="text-3xl font-bold text-white mb-8 uppercase tracking-tight leading-tight border-b border-glass-border pb-4" {...props} />,
+                        h1: ({node, ...props}) => <h1 className="text-3xl font-bold text-white mb-8 tracking-tight leading-tight border-b border-glass-border pb-4" {...props} />,
                         h2: ({node, ...props}) => (
                           <>
                             <h2 className="text-xl font-bold text-white/90 mt-12 mb-6 flex items-center group" {...props}>
