@@ -12,15 +12,21 @@ export const app = express();
 // Middleware for JSON
 app.use(express.json());
 
-// API Routes
+// Enhanced Health Check to debug Vercel environment
 app.get("/api/health", (req, res) => {
-  console.log("[API] Health check reached");
+  console.log("[API] Health check requested");
   res.json({ 
     status: "ok",
     environment: process.env.VERCEL ? "vercel" : "standard",
-    paddleConfigured: !!process.env.PADDLE_API_KEY,
-    webhookSecretSet: !!process.env.PADDLE_WEBHOOK_SECRET,
-    smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS)
+    nodeEnv: process.env.NODE_ENV,
+    smtp: {
+      userSet: !!process.env.SMTP_USER,
+      passSet: !!process.env.SMTP_PASS,
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: process.env.SMTP_PORT || "465 (default)",
+      recipientSet: !!process.env.CONTACT_RECIPIENT
+    },
+    paddleConfigured: !!process.env.PADDLE_API_KEY
   });
 });
 
@@ -53,135 +59,115 @@ app.get("/api/cities", (req, res) => {
 });
 
 app.post("/api/contact", async (req, res) => {
-  console.log("[Contact Form] Request received:", { 
-    bodyPresent: !!req.body,
-    name: req.body?.name,
-    email: req.body?.email
-  });
-  
   const { name, email, message } = req.body;
 
   if (!name || !email || !message) {
-    console.log("[Contact Form] Validation failed: Missing fields");
     return res.status(400).json({ error: "All fields are required" });
   }
 
-  try {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.error("[Contact Form] Missing SMTP credentials");
-      return res.status(500).json({ 
-        error: "Server configuration error", 
-        details: "SMTP_USER or SMTP_PASS environment variables are not set on the host." 
-      });
-    }
+  // Quick check for SMTP credentials before even trying to connect
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.error("[Contact] Missing SMTP_USER or SMTP_PASS");
+    return res.status(500).json({ 
+      error: "Server configuration error", 
+      details: "Email service is not configured (missing credentials)." 
+    });
+  }
 
+  try {
     let recipient = "gomgomtechnologies@gmail.com";
-    let envRecip = process.env.CONTACT_RECIPIENT;
-    
-    if (envRecip) {
-      envRecip = envRecip.replace(/^["']|["']$/g, '').trim();
-      if (envRecip && envRecip !== 'undefined' && envRecip !== 'null' && envRecip.includes('@')) {
-        recipient = envRecip;
+    if (process.env.CONTACT_RECIPIENT) {
+      const r = process.env.CONTACT_RECIPIENT.replace(/^["']|["']$/g, '').trim();
+      if (r && r !== 'undefined' && r.includes('@')) {
+        recipient = r;
       }
     }
 
     const host = process.env.SMTP_HOST || "smtp.gmail.com";
-    const port = parseInt(process.env.SMTP_PORT || "587");
+    const port = parseInt(process.env.SMTP_PORT || "465");
+    const isSecure = port === 465;
 
-    console.log(`[Contact Form] Prep email to ${recipient} via ${host}:${port}`);
+    console.log(`[Contact] Sending to ${recipient} via ${host}:${port} (SSL: ${isSecure})`);
 
-    const transportConfig: any = {
+    const transporter = nodemailer.createTransport({
       host,
       port,
-      secure: port === 465,
+      secure: isSecure,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // Increase timeout for serverless environments
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    };
+      // Aggressive timeouts to fail before Vercel kills the function
+      connectionTimeout: 5000, 
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
+    });
 
-    const transporter = nodemailer.createTransport(transportConfig);
-
-    const mailOptions = {
-      from: process.env.SMTP_USER,
+    const info = await transporter.sendMail({
+      from: `"${name}" <${process.env.SMTP_USER}>`, // Best practice: 'from' matches authenticated user
       replyTo: email,
       to: recipient,
-      subject: `New Contact Submission: ${name}`,
+      subject: `New SEO Machine Lead: ${name}`,
       text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-          <h2 style="color: #0f172a; margin-bottom: 20px;">New Contact Form Submission</h2>
+        <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+          <h2 style="color: #1a1a1a;">New Contact Lead</h2>
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
-          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p><strong>Message:</strong></p>
-          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; color: #334155;">
+          <div style="background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #f0f0f0;">
             ${message.replace(/\n/g, '<br>')}
           </div>
         </div>
       `,
-    };
+    });
 
-    console.log("[Contact Form] Sending email...");
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Contact Form] Success: ${info.messageId}`);
-    res.status(200).json({ success: true, message: "Email sent successfully" });
+    console.log(`[Contact] Success: ${info.messageId}`);
+    return res.status(200).json({ success: true });
   } catch (error: any) {
-    console.error("[Contact Form] SendMail Error:", error);
-    res.status(500).json({ 
-      error: "Failed to send email", 
+    console.error("[Contact] Detailed Error:", {
       message: error.message,
-      code: error.code
+      code: error.code,
+      command: error.command,
+      response: error.response
+    });
+    
+    return res.status(500).json({ 
+      error: "Mail service error", 
+      message: error.message || "Failed to connect to mail server"
     });
   }
 });
 
-// Global error handler
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error("[Global Error Handler]:", err);
-  res.status(500).json({ 
-    error: "Internal Server Error", 
-    message: err.message || "An unexpected error occurred" 
-  });
-});
-
-async function startServer() {
-  const PORT = 3000;
-  
+// Middleware for static files / Vite
+async function configureStaticServing() {
   if (process.env.NODE_ENV !== "production") {
-    // Dynamic import for Vite to avoid loading it in production/Vercel environments
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    // In production (non-Vercel), serve static files from dist
-    if (!process.env.VERCEL) {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
       });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("[Server] Vite middleware failed to load, probably production mode");
     }
-  }
-
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running at http://0.0.0.0:${PORT}`);
+  } else if (!process.env.VERCEL) {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 }
 
-// Only start the server loop if not on Vercel
-// Vercel only needs the exported 'app'
+configureStaticServing();
+
+// Standalone start (non-serverless)
 if (!process.env.VERCEL) {
-  startServer().catch(console.error);
-} else {
-  console.log("[Server] Running in Vercel environment, skipping startServer boot");
+  const PORT = 3000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server started on http://0.0.0.0:${PORT}`);
+  });
 }
