@@ -19,14 +19,13 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     environment: process.env.VERCEL ? "vercel" : "standard",
     nodeEnv: process.env.NODE_ENV,
-    smtp: {
-      userSet: !!process.env.SMTP_USER,
-      passSet: !!process.env.SMTP_PASS,
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: process.env.SMTP_PORT || "465 (default)",
-      recipientSet: !!process.env.CONTACT_RECIPIENT
-    },
-    paddleConfigured: !!process.env.PADDLE_API_KEY
+    paddle: {
+      hasToken: !!process.env.VITE_PADDLE_CLIENT_TOKEN,
+      token: process.env.VITE_PADDLE_CLIENT_TOKEN, // Client tokens are public
+      starter: process.env.VITE_PADDLE_PRICE_ID_STARTER,
+      pro: process.env.VITE_PADDLE_PRICE_ID_PRO,
+      agency: process.env.VITE_PADDLE_PRICE_ID_AGENCY
+    }
   });
 });
 

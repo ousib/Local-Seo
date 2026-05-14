@@ -42,6 +42,7 @@ import { TermsOfService } from "./components/TermsOfService";
 import { Contact } from "./components/Contact";
 import { Help } from "./components/Help";
 import { AdSlot } from "./components/AdSlot";
+import { Pricing } from "./components/Pricing";
 import { BlogPostComponent as BlogPost } from "./components/BlogPost";
 import { Blog } from "./components/Blog";
 import { blogPosts } from "./data/blogPosts";
@@ -133,9 +134,9 @@ const Footer = () => (
         <ul className="space-y-4">
           <li><Link to="/" className="text-sm text-white/40 hover:text-accent transition-colors">Generator</Link></li>
           <li><Link to="/dashboard" className="text-sm text-white/40 hover:text-accent transition-colors">Dashboard</Link></li>
+          <li><Link to="/pricing" className="text-sm text-white/40 hover:text-accent transition-colors">Pricing</Link></li>
           <li><Link to="/about" className="text-sm text-white/40 hover:text-accent transition-colors">How it Works</Link></li>
           <li><Link to="/blog" className="text-sm text-white/40 hover:text-accent transition-colors">Blog</Link></li>
-          <li><Link to="/help" className="text-sm text-white/40 hover:text-accent transition-colors">Help Center</Link></li>
         </ul>
       </div>
 
@@ -180,10 +181,9 @@ const Header = ({ user, handleLogout }: { user: any, handleLogout: () => void })
           <div className="hidden md:flex items-center space-x-6 text-[10px] font-bold uppercase tracking-widest text-white/40">
             <Link to="/" className={`hover:text-accent transition-colors ${location.pathname === '/' ? 'text-accent' : ''}`}>Tools</Link>
             <Link to="/dashboard" className={`hover:text-accent transition-colors ${location.pathname === '/dashboard' ? 'text-accent' : ''}`}>Dashboard</Link>
+            <Link to="/pricing" className={`hover:text-accent transition-colors ${location.pathname === '/pricing' ? 'text-accent' : ''}`}>Pricing</Link>
             <Link to="/help" className={`hover:text-accent transition-colors ${location.pathname === '/help' ? 'text-accent' : ''}`}>Help</Link>
             <Link to="/blog" className={`hover:text-accent transition-colors ${location.pathname.startsWith('/blog') ? 'text-accent' : ''}`}>Blog</Link>
-            <Link to="/about" className={`hover:text-accent transition-colors ${location.pathname === '/about' ? 'text-accent' : ''}`}>About</Link>
-            <Link to="/contact" className={`hover:text-accent transition-colors ${location.pathname === '/contact' ? 'text-accent' : ''}`}>Contact</Link>
           </div>
         </div>
 
@@ -257,6 +257,7 @@ function AppContent() {
     if (path === '/contact') return 'contact';
     if (path === '/help') return 'help';
     if (path === '/blog') return 'blog';
+    if (path === '/pricing') return 'pricing';
     if (path.startsWith('/blog/')) return 'blog-post';
     return 'landing';
   };
@@ -274,6 +275,7 @@ function AppContent() {
       case 'contact': navigate('/contact'); break;
       case 'help': navigate('/help'); break;
       case 'blog': navigate('/blog'); break;
+      case 'pricing': navigate('/pricing'); break;
       case 'blog-post': /* blog post navigation handled by Links directly */ break;
       default: navigate('/');
     }
@@ -321,54 +323,109 @@ function AppContent() {
     }
   }, []);
 
-  const handleUpgrade = () => {
+  const handleUpgrade = (planType: 'starter' | 'pro' | 'agency' = 'pro') => {
     if (!user) {
-      setView("auth");
+      navigate("/auth");
       return;
     }
 
-    const priceId = import.meta.env.VITE_PADDLE_PRICE_ID;
-    const clientToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+    // 1. Get and log all current env variables for debugging
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Check if we have hardcoded old values in Vite's bundle
+    let tokenRaw = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+    let starterRaw = import.meta.env.VITE_PADDLE_PRICE_ID_STARTER;
+    let proRaw = import.meta.env.VITE_PADDLE_PRICE_ID_PRO;
+    let agencyRaw = import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY;
 
-    if (!clientToken || clientToken === 'your-paddle-client-token' || clientToken === '') {
-      alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your AI Studio Secrets.");
-      return;
-    }
+    console.log(`[Paddle ${timestamp}] Client Bundle Secrets:`, {
+      planType,
+      token: tokenRaw?.substring(0, 10) + "...",
+      starter: starterRaw,
+      pro: proRaw,
+      agency: agencyRaw
+    });
 
-    if (!priceId || priceId === 'your-price-id' || priceId === '') {
-      alert("Paddle Price ID is missing. Please add VITE_PADDLE_PRICE_ID to your AI Studio Secrets.");
-      return;
-    }
+    // Strategy: If we detect a PRODUCT ID (pro_) or empty in the bundle, 
+    // it's likely stale. We'll try to fetch fresh values from our health endpoint.
+    const isStale = !proRaw?.startsWith('pri_') || starterRaw?.startsWith('pro_');
 
-    if (!window.Paddle) {
-      alert("Payment system is still loading. Please try again in a few seconds.");
-      return;
-    }
+    const runCheckout = (t: string, s: string, p: string, a: string) => {
+      const token = (t || '').trim();
+      const pMap: Record<string, string | undefined> = {
+        starter: (s || '').trim(),
+        pro: (p || '').trim(),
+        agency: (a || '').trim()
+      };
+      const pid = pMap[planType];
 
-    try {
-      window.Paddle.Checkout.open({
-        items: [
-          {
-            priceId: priceId,
-            quantity: 1
-          }
-        ],
-        customer: {
-          email: user.email
-        },
-        customData: {
-          userId: user.id
-        },
-        settings: {
-          theme: 'dark',
-          displayMode: 'overlay',
-          successUrl: window.location.origin + '/dashboard?paddle_success=true'
-        }
+      console.log(`[Paddle] Attempting ${planType} checkout with:`, {
+        token: token ? (token.substring(0, 10) + "...") : "MISSING",
+        priceId: pid,
+        email: user.email
       });
-    } catch (err) {
-      console.error("Paddle Checkout failed to open:", err);
-      alert("Failed to open checkout. Check if your Price ID is valid for the current environment.");
-    }
+
+      if (!token || token === 'your-paddle-client-token' || token === '') {
+        alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your platform Secrets.");
+        return;
+      }
+      if (!pid || pid === '') {
+        alert(`Missing Price ID for the ${planType} plan. Please check your Secrets.`);
+        return;
+      }
+      if (!pid.startsWith('pri_')) {
+        const secretKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}`;
+        alert(`Configuration Error: ${secretKey} must be a 'Price ID' (starts with pri_), but it is currently: ${pid}`);
+        return;
+      }
+      if (!window.Paddle) {
+        alert("Paddle.js is not initialized yet. Please refresh the page.");
+        return;
+      }
+
+      try {
+        const isTestToken = token.startsWith('test_');
+        const env = isTestToken ? 'sandbox' : 'production';
+        
+        window.Paddle.Environment.set(env);
+        window.Paddle.Initialize({ token: token });
+
+        window.Paddle.Checkout.open({
+          items: [{ priceId: pid, quantity: 1 }],
+          customer: { email: user.email },
+          customData: { userId: user.id, plan: planType },
+          settings: {
+            theme: 'dark',
+            displayMode: 'overlay',
+            locale: 'en',
+            successUrl: window.location.origin + '/dashboard?paddle_success=true'
+          }
+        });
+      } catch (err) {
+        console.error("[Paddle] Checkout Error:", err);
+        alert("Failed to initialize checkout. Check the browser console for details.");
+      }
+    };
+
+    console.log("[Paddle] Fetching latest configuration from server...");
+    fetch("/api/health")
+      .then(res => res.json())
+      .then(data => {
+        if (data.paddle) {
+          runCheckout(
+            data.paddle.token || tokenRaw, // Prefer server token, fallback to bundle
+            data.paddle.starter || starterRaw,
+            data.paddle.pro || proRaw,
+            data.paddle.agency || agencyRaw
+          );
+        } else {
+          runCheckout(tokenRaw, starterRaw, proRaw, agencyRaw);
+        }
+      })
+      .catch((err) => {
+        console.warn("[Paddle] Health check failed, falling back to bundle secrets:", err);
+        runCheckout(tokenRaw, starterRaw, proRaw, agencyRaw);
+      });
   };
 
   const [editingArticle, setEditingArticle] = useState<SavedArticle | null>(null);
@@ -1049,6 +1106,7 @@ ${articleData.content}
 
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          <Route path="/pricing" element={<Pricing handleUpgrade={handleUpgrade} />} />
           <Route path="/" element={
             <motion.div 
               key="landing"
@@ -1843,14 +1901,14 @@ ${articleData.content}
                       <Sparkles className="w-4 h-4 mr-2" />
                       Upgrade to Pro
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Unlock Unlimited Article Generation</h3>
-                    <p className="text-white/60">Free accounts are limited to 10 articles. Get unlimited generation and priority support.</p>
+                    <h3 className="text-2xl font-bold text-white mb-2">Upgrade to Professional</h3>
+                    <p className="text-white/60">Generate 50+ articles monthly, priority support, and advanced schema integration.</p>
                   </div>
                   <button 
-                    onClick={handleUpgrade}
+                    onClick={() => handleUpgrade('pro')}
                     className="px-8 py-4 bg-accent hover:bg-accent-light text-slate-900 font-bold rounded-2xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap"
                   >
-                    Get Pro for $29/mo
+                    Upgrade for $79/mo
                   </button>
                 </motion.div>
               )}
