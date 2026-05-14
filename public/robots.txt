@@ -1,0 +1,10 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Disallow private areas
+Disallow: /dashboard
+Disallow: /edit
+Disallow: /article
+
+Sitemap: https://localseomachine.com/sitemap.xml
