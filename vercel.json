@@ -1,11 +1,14 @@
 {
+  "github": {
+    "silent": true
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|sitemap.xml|robots.txt|assets/|favicon.svg).*)",
       "destination": "/index.html"
     }
   ]
