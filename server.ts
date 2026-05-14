@@ -19,7 +19,8 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     environment: process.env.VERCEL ? "vercel" : "standard",
     paddleConfigured: !!process.env.PADDLE_API_KEY,
-    webhookSecretSet: !!process.env.PADDLE_WEBHOOK_SECRET
+    webhookSecretSet: !!process.env.PADDLE_WEBHOOK_SECRET,
+    smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS)
   });
 });
 
@@ -52,20 +53,25 @@ app.get("/api/cities", (req, res) => {
 });
 
 app.post("/api/contact", async (req, res) => {
-  console.log("[Contact Form] Received request:", JSON.stringify(req.body));
+  console.log("[Contact Form] Request received:", { 
+    bodyPresent: !!req.body,
+    name: req.body?.name,
+    email: req.body?.email
+  });
+  
   const { name, email, message } = req.body;
 
   if (!name || !email || !message) {
-    console.log("[Contact Form] Missing fields:", { name: !!name, email: !!email, message: !!message });
+    console.log("[Contact Form] Validation failed: Missing fields");
     return res.status(400).json({ error: "All fields are required" });
   }
 
   try {
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.error("[Contact Form] Error: SMTP_USER or SMTP_PASS environment variables are not set.");
+      console.error("[Contact Form] Missing SMTP credentials");
       return res.status(500).json({ 
         error: "Server configuration error", 
-        details: "Contact form is not properly configured. Please set SMTP_USER and SMTP_PASS environment variables." 
+        details: "SMTP_USER or SMTP_PASS environment variables are not set on the host." 
       });
     }
 
@@ -73,36 +79,41 @@ app.post("/api/contact", async (req, res) => {
     let envRecip = process.env.CONTACT_RECIPIENT;
     
     if (envRecip) {
-      // Strip literal quotes and common placeholder strings
       envRecip = envRecip.replace(/^["']|["']$/g, '').trim();
       if (envRecip && envRecip !== 'undefined' && envRecip !== 'null' && envRecip.includes('@')) {
         recipient = envRecip;
       }
     }
 
-    console.log(`[Contact Form] Raw Recipient Env: ${process.env.CONTACT_RECIPIENT}`);
-    console.log(`[Contact Form] Resolved Recipient: ${recipient}`);
+    const host = process.env.SMTP_HOST || "smtp.gmail.com";
+    const port = parseInt(process.env.SMTP_PORT || "587");
+
+    console.log(`[Contact Form] Prep email to ${recipient} via ${host}:${port}`);
 
     const transportConfig: any = {
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: process.env.SMTP_PORT === "465",
+      host,
+      port,
+      secure: port === 465,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      // Increase timeout for serverless environments
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     };
 
     const transporter = nodemailer.createTransport(transportConfig);
 
     const mailOptions = {
-      from: process.env.SMTP_USER || "gomgomtechnologies@gmail.com",
+      from: process.env.SMTP_USER,
       replyTo: email,
       to: recipient,
       subject: `New Contact Submission: ${name}`,
       text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 12px;">
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
           <h2 style="color: #0f172a; margin-bottom: 20px;">New Contact Form Submission</h2>
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
@@ -115,19 +126,27 @@ app.post("/api/contact", async (req, res) => {
       `,
     };
 
-    console.log(`[Contact Form] mailOptions.to value: "${mailOptions.to}" type: ${typeof mailOptions.to}`);
-
-    if (!mailOptions.to || mailOptions.to === 'undefined' || !mailOptions.to.includes('@')) {
-      throw new Error(`Invalid recipient address: "${mailOptions.to}"`);
-    }
-
+    console.log("[Contact Form] Sending email...");
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Contact Form] Email sent successfully: ${info.messageId}`);
+    console.log(`[Contact Form] Success: ${info.messageId}`);
     res.status(200).json({ success: true, message: "Email sent successfully" });
   } catch (error: any) {
-    console.error("Error sending email:", error);
-    res.status(500).json({ error: "Failed to send email", details: error.message });
+    console.error("[Contact Form] SendMail Error:", error);
+    res.status(500).json({ 
+      error: "Failed to send email", 
+      message: error.message,
+      code: error.code
+    });
   }
+});
+
+// Global error handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("[Global Error Handler]:", err);
+  res.status(500).json({ 
+    error: "Internal Server Error", 
+    message: err.message || "An unexpected error occurred" 
+  });
 });
 
 async function startServer() {
