@@ -19,13 +19,12 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     environment: process.env.VERCEL ? "vercel" : "standard",
     nodeEnv: process.env.NODE_ENV,
-    paddle: {
-      hasToken: !!process.env.VITE_PADDLE_CLIENT_TOKEN,
-      token: process.env.VITE_PADDLE_CLIENT_TOKEN, // Client tokens are public
-      starter: process.env.VITE_PADDLE_PRICE_ID_STARTER,
-      pro: process.env.VITE_PADDLE_PRICE_ID_PRO,
-      agency: process.env.VITE_PADDLE_PRICE_ID_AGENCY
-    }
+    paddle: Object.keys(process.env)
+      .filter(key => key.startsWith('VITE_PADDLE_'))
+      .reduce((acc, key) => {
+        acc[key] = process.env[key];
+        return acc;
+      }, {} as any)
   });
 });
 

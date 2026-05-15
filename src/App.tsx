@@ -28,7 +28,8 @@ import {
   ChevronRight,
   Home,
   Mail,
-  ShieldAlert
+  ShieldAlert,
+  Zap
 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import Markdown from "react-markdown";
@@ -46,7 +47,10 @@ import { Pricing } from "./components/Pricing";
 import { BlogPostComponent as BlogPost } from "./components/BlogPost";
 import { Blog } from "./components/Blog";
 import { blogPosts } from "./data/blogPosts";
-import { BlogPost as BlogPostType } from "./types";
+import { UsageStats } from "./components/UsageStats";
+import { LimitModal } from "./components/LimitModal";
+import { FREE_LIMITS, PLANS } from "./constants";
+import { UserUsage, PlanId, BillingCycle } from "./types";
 
 declare global {
   interface Window {
@@ -150,7 +154,7 @@ const Footer = () => (
       </div>
     </div>
     
-    <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] items-center font-bold text-white/20 uppercase tracking-[0.2em]">
+    <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">
       <div>&copy; 2026 Local Seo Machine. All rights reserved.</div>
       <div className="flex items-center space-x-8">
         <span>AdSense Ready Platform</span>
@@ -241,8 +245,21 @@ function AppContent() {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [planType, setPlanType] = useState<'free' | 'starter' | 'pro' | 'agency'>('free');
   const [loading, setLoading] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
+  const [userUsage, setUserUsage] = useState<UserUsage>({
+    userId: "",
+    currentPlan: "free",
+    billingCycle: "monthly",
+    generationsUsed: 0,
+    generationLimit: 10,
+    renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    businessesUsed: 0,
+    businessLimit: 0
+  });
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitModalType, setLimitModalType] = useState<"guest" | "registered">("guest");
 
   // Map URLs to views for legacy compatibility and animation keys
   const getViewFromPath = (path: string) => {
@@ -287,55 +304,110 @@ function AppContent() {
     console.log("App mounted, view:", view);
     // Add event listener for global errors
     const handleError = (event: ErrorEvent) => {
+      const msg = event.message || "";
+      if (msg.includes("vite") || msg.includes("WebSocket") || msg.includes("HMR")) {
+        return;
+      }
       console.error("Global error caught:", event.error);
       setBootError(event.error?.message || "Unknown runtime error");
     };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || event.reason || "";
+      if (typeof reason === "string" && (reason.includes("WebSocket") || reason.includes("vite"))) {
+        event.preventDefault();
+        return;
+      }
+    };
+
     window.addEventListener("error", handleError);
-    return () => window.removeEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
   }, [view]);
 
   useEffect(() => {
-    // Initial check for Paddle logic
-    if (window.Paddle) {
-      console.log("[Paddle] Library loaded and available.");
-    }
+    // Initialize Paddle once when tokens are available
+    fetch("/api/health")
+      .then(res => res.json())
+      .then(data => {
+        const token = data.paddle?.token || import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+        
+        if (token && token.startsWith('pri_')) {
+           console.error("[Paddle] Misconfiguration detected: VITE_PADDLE_CLIENT_TOKEN should be a Client Token, not a Price ID.");
+        }
+
+        if (token && window.Paddle) {
+          const isTestToken = token.startsWith('test_');
+          const env = isTestToken ? 'sandbox' : 'production';
+          console.log(`[Paddle] Initializing in ${env} mode`);
+          
+          if (isTestToken) {
+            window.Paddle.Environment.set('sandbox');
+          } else {
+            window.Paddle.Environment.set('production');
+          }
+          
+          window.Paddle.Initialize({ 
+            token: token,
+            eventCallback: (event: any) => {
+              console.log("[Paddle Global Event]", event.name, event);
+            }
+          });
+        } else {
+          console.log("[Paddle] Library or token not ready yet for auto-init.");
+        }
+      })
+      .catch(err => console.error("[Paddle] Failed to auto-initialize from server:", err));
   }, []);
 
-  const handleUpgrade = (planType: 'starter' | 'pro' | 'agency' = 'pro') => {
+  const handleUpgrade = (planType: 'starter' | 'pro' | 'agency' = 'pro', cycle: BillingCycle = 'monthly') => {
     if (!user) {
       navigate("/auth");
       return;
     }
 
-    console.log(`[Paddle] Handle upgrade clicked for plan: ${planType}`);
+    console.log(`[Paddle] Handle upgrade clicked for plan: ${planType} (${cycle})`);
 
-    const runCheckout = (rawToken: string, sPid: string, pPid: string, aPid: string) => {
+    const runCheckout = (rawToken: string, prices: Record<string, string | undefined>) => {
       const token = (rawToken || '').trim().replace(/["']/g, ''); // Remove potential quotes
-      const pMap: Record<string, string | undefined> = {
-        starter: (sPid || '').trim().replace(/["']/g, ''),
-        pro: (pPid || '').trim().replace(/["']/g, ''),
-        agency: (aPid || '').trim().replace(/["']/g, '')
-      };
-      const pid = pMap[planType];
+      
+      const pKey = `${planType}_${cycle}`;
+      const envKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}_${cycle.toUpperCase()}`;
+      const baseEnvKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}`;
+      
+      // Determine which price to use
+      let pid = (prices[pKey] || '').trim();
+      let sourceKey = envKey;
+      
+      if (!pid) {
+        pid = (prices[planType] || '').trim();
+        sourceKey = baseEnvKey;
+      }
+      
+      pid = pid.replace(/["']/g, '');
 
-      console.log(`[Paddle] Preparing checkout with:`, {
+      console.log(`[Paddle] Preparing checkout details:`, {
         plan: planType,
-        tokenPrefix: token ? token.substring(0, 10) : "NONE",
+        cycle,
+        matchedKey: sourceKey,
         priceId: pid,
         email: user.email
       });
 
       if (!token || token === 'your-paddle-client-token' || token === '') {
-        alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your platform Secrets (accessible via settings menu).");
+        alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your platform Secrets.");
         return;
       }
       if (!pid || pid === '') {
-        alert(`Missing Price ID for the ${planType} plan. Please check your VITE_PADDLE_PRICE_ID_${planType.toUpperCase()} Secret.`);
+        alert(`Missing Price ID for the ${planType} ${cycle} plan. \n\nChecked keys: ${pKey}, ${planType}\n\nPlease verify your VITE_PADDLE_PRICE_ID_* secrets.`);
         return;
       }
       if (!pid.startsWith('pri_')) {
-        const secretKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}`;
-        alert(`Configuration Error: ${secretKey} must be a 'Price ID' (starts with pri_), but it is currently: ${pid}\n\nPlease check your Secrets settings.`);
+        const secretKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}_${cycle.toUpperCase()}`;
+        alert(`Configuration Error: Price ID must start with 'pri_'. \n\nFound: ${pid}\n\nKey: ${secretKey}\n\nNote: pro_ is a Product ID, pri_ is a Price ID.`);
         return;
       }
       if (!window.Paddle) {
@@ -347,14 +419,12 @@ function AppContent() {
         const isTestToken = token.startsWith('test_');
         const env = isTestToken ? 'sandbox' : 'production';
         
-        console.log(`[Paddle] Initializing in ${env} mode...`);
-        window.Paddle.Environment.set(env);
-        window.Paddle.Initialize({ token: token });
+        console.log(`[Paddle] Opening checkout for ${env} with PID: ${pid}`);
 
         const checkoutOptions = {
           items: [{ priceId: pid, quantity: 1 }],
           customer: { email: user.email },
-          customData: { userId: user.id, plan: planType },
+          customData: { userId: user.id, plan: planType, cycle },
           settings: {
             theme: 'dark' as const,
             displayMode: 'overlay' as const,
@@ -363,11 +433,10 @@ function AppContent() {
           }
         };
 
-        console.log(`[Paddle] Opening checkout for ${env}...`, checkoutOptions);
         window.Paddle.Checkout.open(checkoutOptions);
       } catch (err) {
         console.error("[Paddle] Startup Error:", err);
-        alert("There was an error starting the checkout. Please check the console for details.");
+        alert(`Failed to start checkout. \n\nCommon fixes:\n1. Ensure '${window.location.hostname}' is added to Approved Domains in Paddle Dashboard.\n2. Verify the Price ID belongs to the correct environment (Sandbox vs Live).`);
       }
     };
 
@@ -376,31 +445,42 @@ function AppContent() {
       .then(res => res.json())
       .then(data => {
         const bundleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
-        const bundleStarter = import.meta.env.VITE_PADDLE_PRICE_ID_STARTER;
-        const bundlePro = import.meta.env.VITE_PADDLE_PRICE_ID_PRO;
-        const bundleAgency = import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY;
+        
+        const getPriceIds = (source: any) => {
+          const p: Record<string, string | undefined> = {};
+          const plans = ['starter', 'pro', 'agency'] as const;
+          const cycles = ['monthly', 'quarterly', 'biannual', 'yearly'] as const;
+          
+          plans.forEach(plan => {
+            // Check both VITE_ prefix and raw key
+            p[plan] = source?.[`VITE_PADDLE_PRICE_ID_${plan.toUpperCase()}`] || source?.[plan];
+            
+            cycles.forEach(cycle => {
+              const k = `${plan}_${cycle}`;
+              p[k] = source?.[`VITE_PADDLE_PRICE_ID_${plan.toUpperCase()}_${cycle.toUpperCase()}`] || source?.[k];
+            });
+          });
+          return p;
+        };
+
+        const envPrices = getPriceIds(import.meta.env);
 
         if (data.paddle) {
           console.log("[Paddle] Using server-provided configuration.");
-          runCheckout(
-            data.paddle.token || bundleToken,
-            data.paddle.starter || bundleStarter,
-            data.paddle.pro || bundlePro,
-            data.paddle.agency || bundleAgency
-          );
+          const serverPrices = getPriceIds(data.paddle);
+          
+          // Merge server prices with env bundle prices as fallback
+          const mergedPrices = { ...envPrices, ...serverPrices };
+          runCheckout(data.paddle.token || bundleToken, mergedPrices);
         } else {
           console.log("[Paddle] Health endpoint didn't return paddle config, falling back to bundle.");
-          runCheckout(bundleToken, bundleStarter, bundlePro, bundleAgency);
+          runCheckout(bundleToken, envPrices);
         }
       })
       .catch((err) => {
         console.warn("[Paddle] Health check failed, falling back to bundle secrets:", err);
-        runCheckout(
-          import.meta.env.VITE_PADDLE_CLIENT_TOKEN,
-          import.meta.env.VITE_PADDLE_PRICE_ID_STARTER,
-          import.meta.env.VITE_PADDLE_PRICE_ID_PRO,
-          import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY
-        );
+        const fallbackPrices = getPriceIds(import.meta.env);
+        runCheckout(import.meta.env.VITE_PADDLE_CLIENT_TOKEN, fallbackPrices);
       });
   };
 
@@ -579,33 +659,133 @@ function AppContent() {
     
     // Check for Paddle success
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('paddle_success') || urlParams.get('session_id')) {
-      setIsPremium(true);
-      console.log("Premium activated");
+    const paddleSuccess = urlParams.get('paddle_success') === 'true';
+    
+    const syncSubscription = async (userId: string) => {
+      try {
+        console.log("[Subscription] Syncing status for user:", userId);
+        
+        // 1. Check existing profile
+        const { data: profile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error("[Subscription] Error fetching profile:", fetchError);
+        }
+
+        // 2. If paddle_success is in URL, update Supabase
+        if (paddleSuccess) {
+          console.log("[Subscription] Detected paddle_success in URL, updating Supabase...");
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .upsert({ 
+              id: userId, 
+              is_premium: true, 
+              updated_at: new Date().toISOString() 
+            });
+
+          if (updateError) {
+            console.error("[Subscription] Error updating profile:", updateError);
+          } else {
+            setIsPremium(true);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } else if (profile) {
+          // 3. Otherwise, set local state from Supabase
+          console.log("[Subscription] Profile found in Supabase:", profile);
+          setIsPremium(!!profile.is_premium);
+          if (profile.plan_type) setPlanType(profile.plan_type as any);
+        }
+      } catch (err) {
+        console.error("[Subscription] Unexpected error during sync:", err);
+      }
+    };
+
+    if (user) {
+      syncSubscription(user.id);
+    } else {
+      setIsPremium(false);
+      setPlanType('free');
     }
 
     const fetchArticles = async () => {
       if (!user) {
-        setSavedArticles([]);
+        console.log("[Articles] No user found, loading from local cache.");
+        loadFromLocalStorage();
         return;
       }
 
-      console.log("Fetching articles for user...");
+      console.log(`[Articles] Syncing and fetching for user: ${user.email} (${user.id})`);
+      
       try {
-        const { data, error } = await supabase
+        // 1. Get articles from Supabase
+        const { data: supabaseData, error: supabaseError } = await supabase
           .from('articles')
           .select('*')
+          .eq('user_id', user.id)
           .order('createdAt', { ascending: false });
-        
-        if (!error && data) {
-          console.log("Fetched articles:", data.length);
-          setSavedArticles(data);
-        } else if (error) {
-          console.warn("Supabase fetch failed, trying localStorage:", error.message);
-          loadFromLocalStorage();
+
+        if (supabaseError) throw supabaseError;
+
+        // Update usage count for registered free users
+        if (!isPremium) {
+          setUserUsage(prev => ({
+            ...prev,
+            generationsUsed: supabaseData?.length || 0,
+            generationLimit: FREE_LIMITS.registered,
+            currentPlan: 'free'
+          }));
+        }
+
+        // 2. Get articles from local storage (potential guest articles)
+        const localSaved = localStorage.getItem("local_seo_articles");
+        let localArticles: SavedArticle[] = [];
+        if (localSaved) {
+          try {
+            localArticles = JSON.parse(localSaved);
+          } catch (e) {
+            console.error("Failed to parse local articles:", e);
+          }
+        }
+
+        // 3. Find unique local articles that aren't in Supabase yet (guest articles)
+        const supabaseIds = new Set(supabaseData?.map(a => a.id) || []);
+        const toUpload = localArticles.filter(a => !supabaseIds.has(a.id));
+
+        if (toUpload.length > 0) {
+          console.log(`[Articles] Found ${toUpload.length} local articles to sync to Supabase.`);
+          // Update user_id for each local article and upload
+          const articlesToSync = toUpload.map(a => ({ ...a, user_id: user.id }));
+          const { error: syncError } = await supabase.from('articles').insert(articlesToSync);
+          
+          if (!syncError) {
+            console.log(`[Articles] Successfully synced guest articles to Supabase.`);
+            // Refetch to get the merged list properly
+            const { data: mergedData } = await supabase
+              .from('articles')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('createdAt', { ascending: false });
+            
+            if (mergedData) {
+              setSavedArticles(mergedData);
+              localStorage.setItem("local_seo_articles", JSON.stringify(mergedData));
+            }
+          } else {
+            console.error("[Articles] Error syncing local articles:", syncError);
+            setSavedArticles(supabaseData || []);
+          }
+        } else {
+          console.log(`[Articles] Successfully fetched ${supabaseData?.length || 0} articles from Supabase.`);
+          setSavedArticles(supabaseData || []);
+          localStorage.setItem("local_seo_articles", JSON.stringify(supabaseData || []));
         }
       } catch (err) {
-        console.error("Supabase request exception:", err);
+        console.error("[Articles] Supabase sync/fetch failed:", err);
         loadFromLocalStorage();
       }
     };
@@ -614,10 +794,15 @@ function AppContent() {
       try {
         const saved = localStorage.getItem("local_seo_articles");
         if (saved) {
-          setSavedArticles(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          console.log(`[Articles] Loaded ${parsed.length} articles from localStorage cache.`);
+          setSavedArticles(parsed);
+        } else {
+          console.log("[Articles] No articles found in localStorage cache.");
+          setSavedArticles([]);
         }
       } catch (err) {
-        console.error("Failed to parse saved articles", err);
+        console.error("[Articles] Failed to parse cached articles", err);
         setSavedArticles([]);
       }
     };
@@ -677,13 +862,15 @@ function AppContent() {
 
     if (saveError) {
       console.error("Supabase persistent save failure:", saveError);
-      // Fallback to localStorage
+      // Fallback to localStorage only (alert user)
       const updated = [newArticle, ...savedArticles];
       setSavedArticles(updated);
       saveToLocalStorage(updated);
       alert("Database unreachable or schema mismatch. Saved to local browser storage instead. Please run the SQL migration provided in the 'About' section.");
     } else {
-      setSavedArticles(prev => [newArticle, ...prev]);
+      const updated = [newArticle, ...savedArticles];
+      setSavedArticles(updated);
+      saveToLocalStorage(updated); // Sync to local cache too
       alert("Article saved to database!");
     }
     
@@ -753,16 +940,29 @@ function AppContent() {
   const generateArticle = async () => {
     if (!formData.location || !formData.topic) return;
 
-    if (!user && guestGenerationCount >= 5) {
-      alert("You've reached the free generation limit for guests (5 articles). Please sign up to continue generating professional content!");
-      setView("auth");
-      return;
-    }
+    if (!user) {
+      if (guestGenerationCount >= FREE_LIMITS.visitor) {
+        setLimitModalType("guest");
+        setShowLimitModal(true);
+        return;
+      }
+    } else {
+      const limit = isPremium ? userUsage.generationLimit : FREE_LIMITS.registered;
+      const used = savedArticles.length;
+      
+      if (used >= limit) {
+        setLimitModalType("registered");
+        setShowLimitModal(true);
+        return;
+      }
 
-    if (!isPremium && savedArticles.length >= 10) {
-      alert("You've reached the free limit of 10 articles. Please upgrade to Pro to generate more content.");
-      setView("dashboard");
-      return;
+      // Usage warnings
+      const percentUsed = (used / limit) * 100;
+      if (used === Math.floor(limit * 0.7)) {
+        alert(`Usage Alert: You've used 70% of your ${limit} monthly generations (${used}/${limit}).`);
+      } else if (used === Math.floor(limit * 0.9)) {
+        alert(`Critical Warning: You've used 90% of your ${limit} monthly generations (${used}/${limit}). Only a few left!`);
+      }
     }
 
     setLoading(true);
@@ -794,22 +994,32 @@ function AppContent() {
     }
 
     if (!user) {
-      if (guestGenerationCount >= 5) {
-        alert("You've reached the free generation limit for guests (5 articles). Please sign up to continue generating professional content!");
-        setView("auth");
+      if (guestGenerationCount >= FREE_LIMITS.visitor) {
+        setLimitModalType("guest");
+        setShowLimitModal(true);
         return;
       }
       
-      const availableCount = 5 - guestGenerationCount;
+      const availableCount = FREE_LIMITS.visitor - guestGenerationCount;
       if (topics.length > availableCount) {
         alert(`You only have ${availableCount} free generations left. Please reduce your batch size or sign up for unlimited access!`);
         return;
       }
-    }
+    } else {
+      const limit = isPremium ? userUsage.generationLimit : FREE_LIMITS.registered;
+      const used = savedArticles.length;
+      const availableCount = limit - used;
 
-    if (!isPremium && topics.length > 10) {
-      alert("Free accounts are limited to 10 articles per batch. Please upgrade to Pro for unlimited bulk generation.");
-      return;
+      if (availableCount <= 0) {
+        setLimitModalType("registered");
+        setShowLimitModal(true);
+        return;
+      }
+
+      if (topics.length > availableCount) {
+        alert(`Insufficient generations remaining. You have ${availableCount} credits left. Please reduce your batch size or upgrade.`);
+        return;
+      }
     }
 
     setIsBatchRunning(true);
@@ -1082,7 +1292,6 @@ ${articleData.content}
 
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
-          <Route path="/pricing" element={<Pricing handleUpgrade={handleUpgrade} />} />
           <Route path="/" element={
             <motion.div 
               key="landing"
@@ -1099,22 +1308,22 @@ ${articleData.content}
                   </div>
                   <button 
                     onClick={() => {
-                      if (user) setView("dashboard");
-                      else setView("auth");
+                      if (user) navigate("/dashboard");
+                      else navigate("/auth");
                     }}
-                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all"
+                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2 rotate-180" />
-                    Dashboard
+                    {user ? "Dashboard" : "Get Started"}
                   </button>
                   <button 
-                    onClick={() => setView("about")}
-                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
+                    onClick={() => navigate("/about")}
+                    className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans text-[10px]"
                   >
                     About
                   </button>
                   <button 
-                    onClick={() => setView("help")}
+                    onClick={() => navigate("/help")}
                     className="inline-flex items-center px-4 py-2 bg-white/5 text-white/70 hover:text-white rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all font-sans"
                   >
                     Help Guide
@@ -1152,7 +1361,6 @@ ${articleData.content}
                     </datalist>
                   </div>
                 </div>
-
                 {/* Location */}
                 <div className="space-y-3 relative" ref={autocompleteRef}>
                   <label className="text-[11px] font-bold text-white/50 uppercase tracking-[0.15em] ml-1 block">
@@ -1255,7 +1463,7 @@ ${articleData.content}
               <button 
                 onClick={isBatchMode ? generateBatch : generateArticle}
                 disabled={loading || (isBatchMode ? !batchTopics : !formData.topic) || !formData.location}
-                className="w-full bg-accent text-slate-950 py-4 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center space-x-2 hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_4px_25px_rgba(76,201,240,0.3)] active:scale-[0.98] text-sm"
+                className="w-full bg-accent text-slate-950 py-5 rounded-3xl font-bold uppercase tracking-widest flex items-center justify-center space-x-2 hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_10px_35px_rgba(76,201,240,0.25)] active:scale-[0.98] text-[13px]"
               >
                 {loading ? (
                   <div className="flex flex-col items-center">
@@ -1270,13 +1478,29 @@ ${articleData.content}
                 )}
               </button>
 
-              {!user && !loading && (
-                <div className="mt-6 flex items-center justify-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
-                  <ShieldAlert className="w-3.5 h-3.5 text-accent" />
-                  <span>Guest Account: {Math.max(0, 5 - guestGenerationCount)} free generations remaining</span>
-                  <button onClick={() => setView("auth")} className="text-accent hover:underline ml-1">Sign Up to Unlock More</button>
+              <div className="mt-8 flex flex-col items-center space-y-4">
+                <div className="flex items-center justify-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+                  <ShieldAlert className={`w-3.5 h-3.5 ${((user ? savedArticles.length : guestGenerationCount) / (user ? (isPremium ? userUsage.generationLimit : FREE_LIMITS.registered) : FREE_LIMITS.visitor)) >= 0.8 ? 'text-orange-500 animate-pulse' : 'text-accent'}`} />
+                  <span>
+                    {user 
+                      ? `${Math.max(0, (isPremium ? userUsage.generationLimit : FREE_LIMITS.registered) - savedArticles.length)} generations remaining`
+                      : `Guest Account: ${Math.max(0, FREE_LIMITS.visitor - guestGenerationCount)} free generations remaining`
+                    }
+                  </span>
+                  {!user && <button onClick={() => navigate("/auth")} className="text-accent hover:underline ml-1">Sign Up to Unlock 10 More</button>}
                 </div>
-              )}
+                
+                {savedArticles.length > 0 && (
+                  <button 
+                    onClick={() => navigate("/dashboard")}
+                    className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-white/20 hover:text-white transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>View all {savedArticles.length} saved articles</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
 
               {/* Progress UI */}
               {loading && !isBatchRunning && (
@@ -1335,10 +1559,10 @@ ${articleData.content}
             </div>
 
             {/* Footnote Stats */}
-            <div className="mt-16 flex flex-wrap justify-center gap-x-12 gap-y-6 text-white/40 text-[11px] font-bold uppercase tracking-[0.1em]">
-              <div className="flex items-center"><b className="text-white mr-2">14,202</b> Articles Generated</div>
-              <div className="flex items-center"><b className="text-white mr-2">98.4%</b> Average SEO Score</div>
-              <div className="flex items-center"><b className="text-white mr-2">842</b> Cities Covered</div>
+            <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-white/20 text-[10px] font-bold uppercase tracking-[0.15em]">
+              <div className="flex items-center"><Building2 className="w-3.5 h-3.5 mr-2 opacity-50" /> 14,202 Articles Generated</div>
+              <div className="flex items-center"><Search className="w-3.5 h-3.5 mr-2 opacity-50" /> 98.4% Average SEO Score</div>
+              <div className="flex items-center"><MapPin className="w-3.5 h-3.5 mr-2 opacity-50" /> 842 Cities Covered</div>
             </div>
 
             <Footer />
@@ -1778,6 +2002,17 @@ ${articleData.content}
           </motion.div>
         } />
 
+        <Route path="/pricing" element={
+          <motion.div 
+            key="pricing"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Pricing handleUpgrade={handleUpgrade} />
+          </motion.div>
+        } />
+
         <Route path="/privacy" element={
           <motion.div 
             key="privacy"
@@ -1852,6 +2087,18 @@ ${articleData.content}
               exit={{ opacity: 0 }}
               className="max-w-6xl mx-auto px-4 py-20 relative z-10"
             >
+            {/* Usage Stats (New) */}
+            <UsageStats 
+              usage={{
+                ...userUsage,
+                generationsUsed: savedArticles.length,
+                generationLimit: isPremium ? userUsage.generationLimit : FREE_LIMITS.registered,
+                businessesUsed: new Set(savedArticles.map(a => a.location)).size,
+                businessLimit: isPremium ? userUsage.businessLimit : 0
+              }} 
+              onUpgrade={() => navigate("/pricing")}
+            />
+
             {/* Dashboard Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
               <div>
@@ -1866,28 +2113,50 @@ ${articleData.content}
                 <p className="text-white/50 font-medium text-sm mt-1">Manage and track your generated SEO assets</p>
               </div>
 
-              {!isPremium && (
-                <motion.div 
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 w-full order-first md:order-none"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center text-accent font-bold text-xs uppercase tracking-widest mb-3">
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Upgrade to Pro
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Upgrade to Professional</h3>
-                    <p className="text-white/60">Generate 50+ articles monthly, priority support, and advanced schema integration.</p>
+            {/* SaaS Analytics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+              <div className="glass-panel p-6 rounded-3xl border-white/5 group hover:border-accent/20 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-accent/10 rounded-lg text-accent">
+                    <Zap className="w-4 h-4" />
                   </div>
-                  <button 
-                    onClick={() => handleUpgrade('pro')}
-                    className="px-8 py-4 bg-accent hover:bg-accent-light text-slate-900 font-bold rounded-2xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap"
-                  >
-                    Upgrade for $79/mo
-                  </button>
-                </motion.div>
-              )}
+                  <div className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">Active</div>
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">{savedArticles.length}</div>
+                <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Total Articles</div>
+              </div>
+              <div className="glass-panel p-6 rounded-3xl border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">{new Set(savedArticles.map(a => a.location)).size}</div>
+                <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Live Locations</div>
+              </div>
+              <div className="glass-panel p-6 rounded-3xl border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {Math.round(savedArticles.reduce((acc, a) => acc + (a.score || 0), 0) / (savedArticles.length || 1))}%
+                </div>
+                <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Avg SEO Score</div>
+              </div>
+              <div className="glass-panel p-6 rounded-3xl border-white/5 bg-accent/5 cursor-pointer hover:bg-accent/10 transition-all" onClick={() => navigate("/pricing")}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-accent rounded-lg text-slate-950">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-sm font-bold text-white mb-1">Scale Growth</div>
+                <div className="text-[10px] font-bold text-accent uppercase tracking-[0.1em] flex items-center">
+                  Upgrade Plan <ChevronRight className="w-3 h-3 ml-1" />
+                </div>
+              </div>
+            </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative">
@@ -2141,6 +2410,18 @@ ${articleData.content}
           </div>
         )}
       </AnimatePresence>
+
+      <LimitModal 
+        isOpen={showLimitModal} 
+        onClose={() => setShowLimitModal(false)}
+        type={limitModalType}
+        generationsUsed={limitModalType === "guest" ? FREE_LIMITS.visitor : FREE_LIMITS.registered}
+        onAuth={(v) => {
+          setShowLimitModal(false);
+          if (v === "auth") navigate("/auth");
+          else navigate("/pricing");
+        }}
+      />
     </div>
   );
 }

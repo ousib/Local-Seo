@@ -1,52 +1,50 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Libre Baskerville", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
   --color-accent: #4cc9f0;
-  --color-glass-bg: rgba(255, 255, 255, 0.08);
-  --color-glass-border: rgba(255, 255, 255, 0.15);
+  --color-glass-bg: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
 }
 
 @layer base {
   body {
-    @apply font-sans antialiased text-white min-h-screen;
-    background-color: #0b0e14;
+    @apply font-sans antialiased text-white min-h-screen bg-slate-950;
     background-image: 
-      radial-gradient(at 0% 0%, #1d2b53 0px, transparent 50%),
-      radial-gradient(at 100% 100%, #3a0ca3 0px, transparent 50%),
-      radial-gradient(at 50% 50%, #7209b7 0px, transparent 50%);
+      radial-gradient(at 0% 0%, #03045e 0px, transparent 50%),
+      radial-gradient(at 100% 100%, #1d2b53 0px, transparent 50%),
+      radial-gradient(at 50% 50%, #023e8a 0px, transparent 50%);
     background-attachment: fixed;
   }
 }
 
-.glass-panel {
-  @apply bg-glass-bg backdrop-blur-[24px] border border-glass-border;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+@utility glass-panel {
+  @apply bg-glass-bg backdrop-blur-xl border border-glass-border shadow-2xl;
 }
 
 /* Professional Blog Content Formatting */
 .prose blockquote {
-  @apply border-l-4 border-accent bg-accent/5 p-6 rounded-r-2xl italic text-white/90;
+  @apply border-l-4 border-accent bg-accent/5 p-6 rounded-r-xl italic text-white/90;
 }
 
 .prose h2 {
-  @apply text-3xl font-bold mt-16 mb-8 text-white tracking-tight border-b border-white/5 pb-4;
+  @apply text-3xl font-bold mt-12 mb-6 text-white tracking-tight;
 }
 
 .prose h3 {
-  @apply text-xl font-bold mt-12 mb-6 text-white/90;
+  @apply text-xl font-bold mt-8 mb-4 text-white/90;
 }
 
 .prose p {
-  @apply leading-relaxed mb-8 text-white/70;
+  @apply leading-relaxed mb-6 text-white/70;
 }
 
 .prose ul, .prose ol {
-  @apply mb-8 space-y-3;
+  @apply mb-6 space-y-2;
 }
 
 .prose li {
