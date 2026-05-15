@@ -168,5 +168,11 @@ if (!process.env.VERCEL) {
   const PORT = 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server started on http://0.0.0.0:${PORT}`);
+    console.log("[Paddle] Startup Check:", {
+      tokenSet: !!process.env.VITE_PADDLE_CLIENT_TOKEN,
+      starter: process.env.VITE_PADDLE_PRICE_ID_STARTER,
+      pro: process.env.VITE_PADDLE_PRICE_ID_PRO,
+      agency: process.env.VITE_PADDLE_PRICE_ID_AGENCY
+    });
   });
 }

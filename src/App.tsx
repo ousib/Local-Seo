@@ -295,31 +295,9 @@ function AppContent() {
   }, [view]);
 
   useEffect(() => {
-    // Initialize Paddle with safety
-    try {
-      const paddleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
-      if (window.Paddle && paddleToken && paddleToken !== 'your-paddle-client-token' && paddleToken !== '') {
-        // Auto-detect environment from token prefix
-        const isLive = paddleToken.startsWith('live_');
-        const isTest = paddleToken.startsWith('test_');
-        
-        // Default to environment variable if prefix is ambiguous, otherwise use prefix
-        const useSandbox = isTest || (!isLive && import.meta.env.VITE_PADDLE_ENVIRONMENT === 'sandbox');
-        
-        console.log("Configuring Paddle. Environment:", useSandbox ? "sandbox" : "production");
-        
-        if (useSandbox) {
-          window.Paddle.Environment.set('sandbox');
-        } else {
-          window.Paddle.Environment.set('production');
-        }
-
-        window.Paddle.Initialize({ 
-          token: paddleToken
-        });
-      }
-    } catch (err) {
-      console.error("Paddle initialization failed:", err);
+    // Initial check for Paddle logic
+    if (window.Paddle) {
+      console.log("[Paddle] Library loaded and available.");
     }
   }, []);
 
@@ -329,53 +307,35 @@ function AppContent() {
       return;
     }
 
-    // 1. Get and log all current env variables for debugging
-    const timestamp = new Date().toLocaleTimeString();
-    
-    // Check if we have hardcoded old values in Vite's bundle
-    let tokenRaw = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
-    let starterRaw = import.meta.env.VITE_PADDLE_PRICE_ID_STARTER;
-    let proRaw = import.meta.env.VITE_PADDLE_PRICE_ID_PRO;
-    let agencyRaw = import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY;
+    console.log(`[Paddle] Handle upgrade clicked for plan: ${planType}`);
 
-    console.log(`[Paddle ${timestamp}] Client Bundle Secrets:`, {
-      planType,
-      token: tokenRaw?.substring(0, 10) + "...",
-      starter: starterRaw,
-      pro: proRaw,
-      agency: agencyRaw
-    });
-
-    // Strategy: If we detect a PRODUCT ID (pro_) or empty in the bundle, 
-    // it's likely stale. We'll try to fetch fresh values from our health endpoint.
-    const isStale = !proRaw?.startsWith('pri_') || starterRaw?.startsWith('pro_');
-
-    const runCheckout = (t: string, s: string, p: string, a: string) => {
-      const token = (t || '').trim();
+    const runCheckout = (rawToken: string, sPid: string, pPid: string, aPid: string) => {
+      const token = (rawToken || '').trim().replace(/["']/g, ''); // Remove potential quotes
       const pMap: Record<string, string | undefined> = {
-        starter: (s || '').trim(),
-        pro: (p || '').trim(),
-        agency: (a || '').trim()
+        starter: (sPid || '').trim().replace(/["']/g, ''),
+        pro: (pPid || '').trim().replace(/["']/g, ''),
+        agency: (aPid || '').trim().replace(/["']/g, '')
       };
       const pid = pMap[planType];
 
-      console.log(`[Paddle] Attempting ${planType} checkout with:`, {
-        token: token ? (token.substring(0, 10) + "...") : "MISSING",
+      console.log(`[Paddle] Preparing checkout with:`, {
+        plan: planType,
+        tokenPrefix: token ? token.substring(0, 10) : "NONE",
         priceId: pid,
         email: user.email
       });
 
       if (!token || token === 'your-paddle-client-token' || token === '') {
-        alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your platform Secrets.");
+        alert("Paddle Client Token is missing. Please add VITE_PADDLE_CLIENT_TOKEN to your platform Secrets (accessible via settings menu).");
         return;
       }
       if (!pid || pid === '') {
-        alert(`Missing Price ID for the ${planType} plan. Please check your Secrets.`);
+        alert(`Missing Price ID for the ${planType} plan. Please check your VITE_PADDLE_PRICE_ID_${planType.toUpperCase()} Secret.`);
         return;
       }
       if (!pid.startsWith('pri_')) {
         const secretKey = `VITE_PADDLE_PRICE_ID_${planType.toUpperCase()}`;
-        alert(`Configuration Error: ${secretKey} must be a 'Price ID' (starts with pri_), but it is currently: ${pid}`);
+        alert(`Configuration Error: ${secretKey} must be a 'Price ID' (starts with pri_), but it is currently: ${pid}\n\nPlease check your Secrets settings.`);
         return;
       }
       if (!window.Paddle) {
@@ -387,44 +347,60 @@ function AppContent() {
         const isTestToken = token.startsWith('test_');
         const env = isTestToken ? 'sandbox' : 'production';
         
+        console.log(`[Paddle] Initializing in ${env} mode...`);
         window.Paddle.Environment.set(env);
         window.Paddle.Initialize({ token: token });
 
-        window.Paddle.Checkout.open({
+        const checkoutOptions = {
           items: [{ priceId: pid, quantity: 1 }],
           customer: { email: user.email },
           customData: { userId: user.id, plan: planType },
           settings: {
-            theme: 'dark',
-            displayMode: 'overlay',
+            theme: 'dark' as const,
+            displayMode: 'overlay' as const,
             locale: 'en',
             successUrl: window.location.origin + '/dashboard?paddle_success=true'
           }
-        });
+        };
+
+        console.log(`[Paddle] Opening checkout for ${env}...`, checkoutOptions);
+        window.Paddle.Checkout.open(checkoutOptions);
       } catch (err) {
-        console.error("[Paddle] Checkout Error:", err);
-        alert("Failed to initialize checkout. Check the browser console for details.");
+        console.error("[Paddle] Startup Error:", err);
+        alert("There was an error starting the checkout. Please check the console for details.");
       }
     };
 
-    console.log("[Paddle] Fetching latest configuration from server...");
+    // Always fetch fresh secrets from server to avoid Vite bundle staleness
     fetch("/api/health")
       .then(res => res.json())
       .then(data => {
+        const bundleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
+        const bundleStarter = import.meta.env.VITE_PADDLE_PRICE_ID_STARTER;
+        const bundlePro = import.meta.env.VITE_PADDLE_PRICE_ID_PRO;
+        const bundleAgency = import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY;
+
         if (data.paddle) {
+          console.log("[Paddle] Using server-provided configuration.");
           runCheckout(
-            data.paddle.token || tokenRaw, // Prefer server token, fallback to bundle
-            data.paddle.starter || starterRaw,
-            data.paddle.pro || proRaw,
-            data.paddle.agency || agencyRaw
+            data.paddle.token || bundleToken,
+            data.paddle.starter || bundleStarter,
+            data.paddle.pro || bundlePro,
+            data.paddle.agency || bundleAgency
           );
         } else {
-          runCheckout(tokenRaw, starterRaw, proRaw, agencyRaw);
+          console.log("[Paddle] Health endpoint didn't return paddle config, falling back to bundle.");
+          runCheckout(bundleToken, bundleStarter, bundlePro, bundleAgency);
         }
       })
       .catch((err) => {
         console.warn("[Paddle] Health check failed, falling back to bundle secrets:", err);
-        runCheckout(tokenRaw, starterRaw, proRaw, agencyRaw);
+        runCheckout(
+          import.meta.env.VITE_PADDLE_CLIENT_TOKEN,
+          import.meta.env.VITE_PADDLE_PRICE_ID_STARTER,
+          import.meta.env.VITE_PADDLE_PRICE_ID_PRO,
+          import.meta.env.VITE_PADDLE_PRICE_ID_AGENCY
+        );
       });
   };
 
